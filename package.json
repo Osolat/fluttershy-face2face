@@ -1,0 +1,23 @@
+{
+  "name": "face2face",
+  "version": "1.0.0",
+  "description": "Peer-to-peer application for collaboration",
+  "main": "index.js",
+  "dependencies": {
+    "express": "^4.17.1"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Osolat/fluttershy-face2face.git"
+  },
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Osolat/fluttershy-face2face/issues"
+  },
+  "homepage": "https://github.com/Osolat/fluttershy-face2face#readme"
+}
