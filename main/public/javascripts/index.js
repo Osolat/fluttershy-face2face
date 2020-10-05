@@ -1,9 +1,10 @@
 //Basic button setup
-$("#chat-text-input").on("keypress", function (event) {
+const textInput = $("#chat-text-input");
+textInput.on("keypress", function (event) {
     if (event.which === 13 && !event.shiftKey) {
         event.preventDefault();
-        const str = $("#chat-text-input").val();
-        postChatMessage(str).then(() => $("#chat-text-input").val(""));
+        const str = textInput.val();
+        postChatMessage(str).then(() => textInput.val(""));
     }
 });
 start();
