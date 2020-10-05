@@ -8,6 +8,7 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
 - Implement https
     - Needs certificate to function, only possible when server is live
     - Test system with multiple users
+- Support multiple different callers at once.
 - Implement file sharing system
 - Chat system
 - Database for storing chatlogs
