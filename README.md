@@ -5,6 +5,7 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
 - Implement https
     - Test system with multiple users
 - Implement file sharing system
+- Chat system
 - Database for storing chatlogs
 - Make groups
     - Share links to groups
