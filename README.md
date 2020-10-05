@@ -2,7 +2,11 @@
 This is a repository for the P2P course, which aims to implement WebRTC and some P2P architecture to create a collaborative video conference application.
 
 # TODO
+- Need new main page
+    - Join group chat by ID
+        - Optionally with password for room
 - Implement https
+    - Needs certificate to function, only possible when server is live
     - Test system with multiple users
 - Implement file sharing system
 - Chat system

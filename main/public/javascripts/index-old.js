@@ -6,10 +6,9 @@ $("#chat-text-input").on("keypress", function (event) {
         postChatMessage(str).then(() => $("#chat-text-input").val(""));
     }
 });
-start();
+
 const peerConnection = new RTCPeerConnection();
 
-/*
 navigator.getUserMedia(
     {video: true, audio: true},
     stream => {
@@ -24,7 +23,6 @@ navigator.getUserMedia(
         console.warn(error.message);
     }
 );
-*/
 
 peerConnection.ontrack = function ({streams: [stream]}) {
     const remoteVideo = document.getElementById("remote-video");
@@ -99,24 +97,6 @@ function createUserItemContainer(socketId) {
         callUser(socketId);
     });
     return userContainerEl;
-}
-
-function start() {
-    console.log('Requesting local stream');
-    navigator.mediaDevices
-        .getUserMedia({
-            audio: true,
-            video: true
-        })
-        .then(gotStream)
-        .catch(e => console.log('getUserMedia() error: ', e));
-}
-
-function gotStream(stream) {
-    console.log('Received local stream');
-    const localVideo = document.getElementById("local-video");
-    localVideo.srcObject = stream;
-    window.localStream = stream;
 }
 
 async function postChatMessage(str) {
