@@ -9,23 +9,6 @@ $("#chat-text-input").on("keypress", function (event) {
 start();
 const peerConnection = new RTCPeerConnection();
 
-/*
-navigator.getUserMedia(
-    {video: true, audio: true},
-    stream => {
-        const localVideo = document.getElementById("local-video");
-        if (localVideo) {
-            localVideo.srcObject = stream;
-        }
-
-        stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
-    },
-    error => {
-        console.warn(error.message);
-    }
-);
-*/
-
 peerConnection.ontrack = function ({streams: [stream]}) {
     const remoteVideo = document.getElementById("remote-video");
     if (remoteVideo) {
