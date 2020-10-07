@@ -97,6 +97,11 @@ body {
 #chat-text-input{
   width: 50%;
 }
+.active-user-video {
+  width: 5%;
+  height: 5%;
+}
+
 .remote-video {
   border: 1px solid #cddfe7;
   width: 80%;

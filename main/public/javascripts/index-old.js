@@ -42,6 +42,7 @@ socket.on("remove-user", ({socketId}) => {
         elToRemove.remove();
     }
 });
+
 let isAlreadyCalling = false;
 socket.on("answer-made", async data => {
     await peerConnection.setRemoteDescription(

@@ -21,7 +21,13 @@ io.on("connection", socket => {
     const existingSocket = activeSockets.find(
         existingSocket => existingSocket === socket.id
     );
-
+    socket.on("request-user-list", () => {
+        socket.emit("update-user-list", {
+            users: activeSockets.filter(
+                existingSocket => existingSocket !== socket.id
+            )
+        });
+    })
     if (!existingSocket) {
         activeSockets.push(socket.id);
         socket.broadcast.emit("update-user-list", {
