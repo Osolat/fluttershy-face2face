@@ -11,8 +11,8 @@ const peerConnection = new RTCPeerConnection();
 const RTCConnections = {};
 const RTCConnectionsCallStatus = {};
 
-const socket = io.connect("localhost");
-bootAndGetSocket().then(r => console.log("Setup f   inished"));
+const socket = io.connect(window.location.hostname);
+bootAndGetSocket().then(r => console.log("Setup finished"));
 
 async function bootAndGetSocket() {
     await initLocalStream();
