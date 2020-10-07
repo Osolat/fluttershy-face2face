@@ -12,7 +12,7 @@ const RTCConnections = {};
 const RTCConnectionsCallStatus = {};
 
 const socket = io.connect("localhost");
-bootAndGetSocket().then(r => console.log("Setup finished"));
+bootAndGetSocket().then(r => console.log("Setup f   inished"));
 
 async function bootAndGetSocket() {
     await initLocalStream();
