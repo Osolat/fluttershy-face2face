@@ -68,14 +68,28 @@
       text-decoration: none;
       cursor: pointer;
     }
+
+    /* The Close Button */
+    .close2 {
+      color: #aaaaaa;
+      float: right;
+      font-size: 28px;
+      font-weight: bold;
+    }
+
+    .close2:hover,
+    .close2:focus {
+      color: #000;
+      text-decoration: none;
+      cursor: pointer;
+    }
 </style>
+
 <style>
     .center {
         text-align: center;
     }
 </style>
-
-  
 
 <body>
 <div class="container">
@@ -90,13 +104,14 @@
 </div>
 <div id = "room-selection" class="center">
     <h1> Create/Join a chat room </h1> 
-    <p id="instruction">Please enter a room name.</p>
+    <p id="instruction">Please enter a room ID.</p>
     <div>
-        <div id = "room-id-input-div">
-            <input id = "room-id-input" type = text autofocus="" placeholder = "Enter Room ID" size = "29">
+        <div id = "room-id-input-div" position = "absolute">
+            <input id = "room-id-input" type = text autofocus="" placeholder = "Enter Room ID" size = "29" onkeyup='check();' >
+            <span id='message'></span>
         </div>
         <div id = "room-id-input-buttons">
-            <button id = "join-button" class = "button"> JOIN </button>
+            <button id = "join-button"  class = "button"> JOIN </button>
             <div id="myModal" class="modal">
                 <!-- Modal content -->
                 <div class="modal-content">
@@ -106,7 +121,7 @@
                     <input id = "room-nickname-input" type = text autofocus="" placeholder = "Enter Nickname" size = "29" class = "input">
                   </div>
                   <div id = "room-psw-input-div">
-                    <input id = "room-psw-input" type = text autofocus="" placeholder = "Enter Room Password" size = "29" class = "input">
+                    <input id = "room-psw-input" type = "password" autofocus="" placeholder = "Enter Room Password" size = "29" class = "input">
                   </div>
                   <div id = "popup-id-input-buttons">
                     <button id = "join-button-popup" class = "button"> JOIN </button>
@@ -114,6 +129,25 @@
                 </div>
               </div>
             <button id = "Create-button" class = "button"> CREATE </button>
+            <div id="createPopup" class="modal">
+                <!-- Modal content -->
+                <div class="modal-content">
+                  <span class="close2">&times;</span>
+                  <p>Some text in the Modal..</p>
+                  <div id = "create-ID-input-div">
+                    <input id = "create-ID-input" type = text autofocus="" placeholder = "Enter ID" size = "29" class = "input">
+                  </div>  
+                  <div id = "create-psw-input-div">
+                    <input id = "create-psw-input" type = "password" autofocus="" placeholder = "Enter Room Password" size = "29" class = "input">
+                  </div>
+                  <div id = "create-psw-match-input-div">
+                    <input id = "create-psw-match-input" type = "password" autofocus="" placeholder = "Enter Room Password" size = "29" class = "input">
+                  </div>
+                  <div id = "popup-id-input-buttons">
+                    <button id = "create-button-popup" class = "button"> CREATE </button>
+                  </div>
+                </div>
+              </div>
         </div>
     </div>
 </div>
@@ -121,29 +155,76 @@
     <script>
     // Get the modal
     var modal = document.getElementById("myModal");
+    var modal2 = document.getElementById("createPopup");
     
     // Get the button that opens the modal
     var btn = document.getElementById("join-button");
     
+    var creatBtn = document.getElementById("Create-button");
+    var creatBtnPop = document.getElementById("create-button-popup");
+
+    var pswbtn = document.getElementById("join-button-popup")
+
     // Get the <span> element that closes the modal
     var span = document.getElementsByClassName("close")[0];
+
+    var span2 = document.getElementsByClassName("close2")[0];
     
     // When the user clicks the button, open the modal 
     btn.onclick = function() {
+      if (document.getElementById('room-id-input').value == "123456789"){
       modal.style.display = "block";
+      } else {
+        alert("Incorrect ID, please try again");
+      }
+    }
+
+    creatBtn.onclick = function() {
+      modal2.style.display = "block";
+    }
+
+    pswbtn.onclick = function() {
+      if (document.getElementById('room-psw-input').value == "YeetBeet"){
+        window.location.href = 'http://localhost/roomPage.html';                        //Template code, put correct get request with right parameters
+        //alert("Password correct, do somethin else.");
+      } else {
+        alert("Password incorrect");
+      }
+    }
+
+    creatBtnPop.onclick = function() {
+      if (document.getElementById('create-ID-input').value != ""){  
+        if (document.getElementById('create-psw-input').value == document.getElementById('create-psw-match-input').value) {
+            window.location.href = 'http://localhost/roomPage.html';
+            //alert("Password match, do something else");
+            } else {
+            alert("Password does not match");
+            }
+        } else {
+            alert("ID field is empty, please enter ID");
+        }
     }
     
     // When the user clicks on <span> (x), close the modal
     span.onclick = function() {
       modal.style.display = "none";
     }
+
+    // When the user clicks on <span> (x), close the modal
+    span2.onclick = function() {
+      modal2.style.display = "none";
+    }
     
     // When the user clicks anywhere outside of the modal, close it
     window.onclick = function(event) {
       if (event.target == modal) {
         modal.style.display = "none";
+      } else if (event.target == modal) {
+        modal2.style.display = "none";
       }
     }
+
+    
     </script>
 
 </body>
