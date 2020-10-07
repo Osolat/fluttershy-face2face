@@ -20,7 +20,7 @@ peerConnection.ontrack = function ({streams: [stream]}) {
         remoteVideo.srcObject = stream;
     }
 };
-const socket = io.connect("localhost:3000");
+const socket = io.connect("192.168.43.84:3000");
 socket.on("update-user-list", ({users}) => {
     updateUserList(users);
 });
