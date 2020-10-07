@@ -14,8 +14,8 @@ const http = require('http').createServer(app);
 http.listen(port, () => {
     console.log(`Example app listening at http://localhost:${port}`);
 })
-const io = require('socket.io')(http);
 
+const io = require('socket.io')(http);
 activeSockets = [];
 io.on("connection", socket => {
     const existingSocket = activeSockets.find(

@@ -25,6 +25,12 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
 - Stream local video to group/call
 
 # Interesting Links
+- https://letsencrypt.org/
+    - for certificates etc
+- https://developers.google.com/web/tools/puppeteer/
+    - for site testing
+- https://alexei-led.github.io/post/pumba_docker_chaos_testing/
+    - for for testing networks inside docker
 - https://peertube.dk/
 - https://news.ycombinator.com/item?id=23398261
 - https://webtorrent.io/
