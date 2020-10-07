@@ -24,7 +24,6 @@ socket.on('connect', (socket) => {
 
 socket.on("update-user-list", ({users}) => {
     updateUserList(users);
-    let RTCConnection =
 });
 
 socket.on("remove-user", ({socketId}) => {
