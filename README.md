@@ -26,6 +26,8 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
 - Screenshare feature
 - Stream local video to group/call
 -Display different tabs with content for all users
+    - Tabs include images, or simple display files
+    - A tab suggestion is also to have Overleaf embedded with the group appropriate link
 -Nice to have chat commands
 
 # Interesting Links
