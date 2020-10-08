@@ -10,6 +10,8 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
     - Test system with multiple users
 - Support multiple different callers at once.
 - Implement file sharing system
+    - Display Shared files (immutable)
+    - Download link shows up in chatlogs
 - Chat system
 - Database for storing chatlogs
 - Make groups
@@ -23,6 +25,8 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
     - Or, timed notifications for meeting startup
 - Screenshare feature
 - Stream local video to group/call
+-Display different tabs with content for all users
+-Nice to have chat commands
 
 # Interesting Links
 - https://letsencrypt.org/
