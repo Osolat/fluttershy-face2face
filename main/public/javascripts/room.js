@@ -61,7 +61,6 @@ async function bootAndGetSocket() {
 }
 
 function castRemoteStreamToFocus(socketId) {
-    console.log("Ho")
     const alreadyExistingUser = document.getElementById(socketId);
     if (alreadyExistingUser !== false) {
         let focusVid = document.getElementById("focus-video");
