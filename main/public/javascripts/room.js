@@ -159,4 +159,26 @@ function gotStream(stream) {
 
 async function postChatMessage(str) {
     console.log("Uploaded message: " + str);
+    var ts = Date.now();
+    var h = new Date(ts).getHours();
+    var m = new Date(ts).getMinutes();
+    var s = new Date(ts).getSeconds();
+    h = (h < 10) ? '0' + h : h;
+    m = (m < 10) ? '0' + m : m;
+    s = (s < 10) ? '0' + s : s;
+
+    var formattedTime = h + ':' + m + ':' + s + "  ";
+    const chatEntryItem = document.createElement("li");
+    const tsFormt = document.createElement("p")
+    const messageFormat = document.createElement("p");
+    /* tsFormt.setAttribute("class", "timestamp-chat")
+     tsFormt.innerHTML = formattedTime;
+     messageFormat.innerHTML = str;
+     chatEntryItem.append(tsFormt);
+     chatEntryItem.append(messageFormat);*/
+    chatEntryItem.innerHTML = '<p class="timestamp-chat">' + formattedTime + '<span class="chat-message">' + str + '</span>' + '</p>'
+    const chatloglist = document.getElementById("chat-log-list");
+    if (chatloglist) {
+        chatloglist.appendChild(chatEntryItem);
+    }
 }

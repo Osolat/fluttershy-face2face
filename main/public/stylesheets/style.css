@@ -107,6 +107,27 @@ body {
 
 }
 
+.timestamp-chat {
+    font-size: 10px;
+    color: #65A9E5;
+
+}
+
+.chat-message {
+    font-size: 15px;
+    color: black;
+
+}
+.chat-log {
+    overflow-y: scroll;
+    height: 80%;
+}
+#chat-log-list {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+}
+
 #chat-text-input {
     width: 90%;
 }
