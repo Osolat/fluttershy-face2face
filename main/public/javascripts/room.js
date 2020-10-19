@@ -11,7 +11,7 @@ const peerConnection = new RTCPeerConnection();
 const RTCConnections = {};
 const RTCConnectionsCallStatus = {};
 
-const socket = io.connect("localhost");
+const socket = io.connect(window.location.hostname);
 bootAndGetSocket().then(r => console.log("Setup finished"));
 
 async function bootAndGetSocket() {
@@ -60,6 +60,15 @@ async function bootAndGetSocket() {
     socket.emit("request-user-list");
 }
 
+function castRemoteStreamToFocus(socketId) {
+    console.log("Ho")
+    const alreadyExistingUser = document.getElementById(socketId);
+    if (alreadyExistingUser !== false) {
+        let focusVid = document.getElementById("focus-video");
+        focusVid.append(alreadyExistingUser);
+    }
+}
+
 function gotRemoteStream(rtcTrackEvent, userId) {
     const video = document.getElementById(userId);
     if (video.srcObject !== rtcTrackEvent.streams[0]) {
@@ -71,9 +80,7 @@ function initNewRTCConnection(socketId) {
     let rtcConnection = new RTCPeerConnection();
     rtcConnection.ontrack = function ({streams: [stream]}) {
         const remoteVideo = document.getElementById(socketId);
-        console.log("Something here too: " + socketId)
         if (remoteVideo) {
-            console.log("Something in init: " + socketId)
             remoteVideo.srcObject = stream;
         }
     };
@@ -88,6 +95,7 @@ function updateUserList(socketIds) {
         const alreadyExistingUser = document.getElementById(socketId);
         if (!alreadyExistingUser) {
             const userContainerEl = createUserVideoItemContainer(socketId);
+            userContainerEl.onclick = () => castRemoteStreamToFocus(socketId);
             activeUserContainer.appendChild(userContainerEl);
             initNewRTCConnection(socketId);
             callUser(socketId);
