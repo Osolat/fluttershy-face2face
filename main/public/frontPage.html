@@ -189,12 +189,21 @@
     }
 
     pswbtn.onclick = function () {
-        if (document.getElementById('room-psw-input').value == "YeetBeet") {
+        let xhr = new XMLHttpRequest();
+        var params = "group-id=" + document.getElementById('room-id-input').value + "&password=" + document.getElementById('room-psw-input').value;
+        xhr.open('GET', "/rooms?" + params, true);
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState === 4 && xhr.status === 200) {
+                window.location.href = "./roomPage.html"
+            }
+        };
+        xhr.send();
+        /*if (document.getElementById('room-psw-input').value == "YeetBeet") {
             window.location.href = 'http://localhost/roomPage.html';                        //Template code, put correct get request with right parameters
             //alert("Password correct, do somethin else.");
         } else {
             alert("Password incorrect");
-        }
+        }*/
     }
 
     creatBtnPop.onclick = function () {
