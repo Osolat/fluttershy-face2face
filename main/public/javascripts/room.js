@@ -16,9 +16,8 @@ let socket;
 function authenticateUser() {
     var cook = document.cookie;
     if (!cook) {
-        window.close();
+        window.location.replace("..");
     }
-    console.log(cook);
     socket = io.connect(window.location.hostname);
     bootAndGetSocket().then(r => console.log("Setup finished"));
 }
@@ -27,6 +26,8 @@ authenticateUser();
 
 async function bootAndGetSocket() {
     await initLocalStream();
+    // TODO: Handle different room IDs.
+
     socket.on('connect', (socket) => {
         console.log("Connected to discovery server through socket.");
     })
