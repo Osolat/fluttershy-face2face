@@ -3,6 +3,7 @@ var router = express.Router();
 var path = require('path');
 const fs = require('fs');
 /* GET home page. */
+
 router.get('/', function (req, res, next) {
     res.sendFile(path.join(__dirname + '/../public/frontPage.html'));
 });
@@ -27,7 +28,8 @@ function addGroupToDataBase(id, password) {
 router.post('/', express.json({type: '*/*'}), (req, res) => {
     if (req.body.hasOwnProperty('group-id') && req.body.hasOwnProperty('password')) {
         addGroupToDataBase(req.body['group-id'], req.body.password)
+        res.json(req.body);
     }
-    res.json(req.body);
+    res.status(500).send();
 })
 module.exports = router;

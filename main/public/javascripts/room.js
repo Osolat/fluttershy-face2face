@@ -1,4 +1,5 @@
 //Basic button setup
+
 const textInput = $("#chat-text-input");
 textInput.on("keypress", function (event) {
     if (event.which === 13 && !event.shiftKey) {
@@ -10,9 +11,19 @@ textInput.on("keypress", function (event) {
 const peerConnection = new RTCPeerConnection();
 const RTCConnections = {};
 const RTCConnectionsCallStatus = {};
+let socket;
 
-const socket = io.connect(window.location.hostname);
-bootAndGetSocket().then(r => console.log("Setup finished"));
+function authenticateUser() {
+    var cook = document.cookie;
+    if (!cook) {
+        window.close();
+    }
+    console.log(cook);
+    socket = io.connect(window.location.hostname);
+    bootAndGetSocket().then(r => console.log("Setup finished"));
+}
+
+authenticateUser();
 
 async function bootAndGetSocket() {
     await initLocalStream();
