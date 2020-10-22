@@ -28,6 +28,7 @@ io.on("connection", socket => {
         existingSocket => existingSocket === socket.id
     );
     socket.on("request-user-list", (id) => {
+        console.log("Id inside request-user-list: " + id);
         socket.emit("update-user-list", {
             users: activeSockets[id].filter(
                 existingSocket => existingSocket !== socket.id

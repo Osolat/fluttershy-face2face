@@ -19,7 +19,16 @@ function authenticateUser() {
     if (!cook) {
         window.location.replace("..");
     }
-    roomID = cook.split(':')[0].split('=')[1].split(';')[0];
+    roomID = cook.split(';');
+    for (const splitKey in cook.split(';')) {
+        var splitAroundEq = roomID[splitKey].split('=');
+        if (splitAroundEq[0].trim() === "group-id") {
+            roomID = splitAroundEq[1].trim();
+        }
+    }
+    console.log(roomID);
+    const header = document.getElementById("room-header-id");
+    header.innerHTML = decodeURI(roomID);
     socket = io.connect(window.location.hostname, {query: {"group-id": roomID}});
     bootAndGetSocket().then(r => console.log("Setup finished"));
 }
