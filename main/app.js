@@ -18,6 +18,7 @@ http.listen(port, () => {
 
 const io = require('socket.io')(http);
 activeSockets = [];
+
 io.on("connection", socket => {
     const existingSocket = activeSockets.find(
         existingSocket => existingSocket === socket.id

@@ -15,10 +15,12 @@ let socket;
 
 function authenticateUser() {
     var cook = document.cookie;
+    var cookiesplit = cook.split(':');
+    console.log(cook.split(':')[0].split('=')[1].split(';')[0]);
     if (!cook) {
         window.location.replace("..");
     }
-    socket = io.connect(window.location.hostname);
+    socket = io.connect(window.location.hostname, {query: {"group-id": cook.split(':')[0].split('=')[1].split(';')[0]}});
     bootAndGetSocket().then(r => console.log("Setup finished"));
 }
 
