@@ -12,13 +12,15 @@ const peerConnection = new RTCPeerConnection();
 const RTCConnections = {};
 const RTCConnectionsCallStatus = {};
 let socket;
+let roomID;
 
 function authenticateUser() {
     var cook = document.cookie;
     if (!cook) {
         window.location.replace("..");
     }
-    socket = io.connect(window.location.hostname);
+    roomID = cook.split(':')[0].split('=')[1].split(';')[0];
+    socket = io.connect(window.location.hostname, {query: {"group-id": roomID}});
     bootAndGetSocket().then(r => console.log("Setup finished"));
 }
 
@@ -69,7 +71,7 @@ async function bootAndGetSocket() {
             to: data.socket
         });
     });
-    socket.emit("request-user-list");
+    socket.emit("request-user-list", roomID);
 }
 
 function castRemoteStreamToFocus(socketId) {

@@ -17,33 +17,39 @@ http.listen(port, () => {
 })
 
 const io = require('socket.io')(http);
-activeSockets = [];
+activeSockets = {};
+
 io.on("connection", socket => {
-    const existingSocket = activeSockets.find(
+    const roomID = socket.handshake.query['group-id'];
+    if (!activeSockets.hasOwnProperty(roomID)) {
+        activeSockets[roomID] = []
+    }
+    const existingSocket = activeSockets[roomID].find(
         existingSocket => existingSocket === socket.id
     );
-    socket.on("request-user-list", () => {
+    socket.on("request-user-list", (id) => {
         socket.emit("update-user-list", {
-            users: activeSockets.filter(
+            users: activeSockets[id].filter(
                 existingSocket => existingSocket !== socket.id
             )
         });
     })
     if (!existingSocket) {
-        activeSockets.push(socket.id);
-        socket.broadcast.emit("update-user-list", {
+        activeSockets[roomID].push(socket.id);
+        socket.join(roomID);
+        socket.to(roomID).emit("update-user-list", {
             users: [socket.id]
         });
         socket.on("disconnect", () => {
-            activeSockets = activeSockets.filter(
+            activeSockets[roomID] = activeSockets[roomID].filter(
                 existingSocket => existingSocket !== socket.id
             );
-            socket.broadcast.emit("remove-user", {
+            socket.to(roomID).emit("remove-user", {
                 socketId: socket.id
             });
         });
         socket.emit("update-user-list", {
-            users: activeSockets.filter(
+            users: activeSockets[roomID].filter(
                 existingSocket => existingSocket !== socket.id
             )
         });
