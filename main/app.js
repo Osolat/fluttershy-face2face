@@ -18,6 +18,7 @@ http.listen(port, () => {
 
 const io = require('socket.io')(http);
 activeSockets = {};
+identificationMap = {};
 
 io.on("connection", socket => {
     const roomID = socket.handshake.query['group-id'];
@@ -35,12 +36,24 @@ io.on("connection", socket => {
             )
         });
     })
+    socket.on("request-user-names", () => {
+        socket.emit("latest-names", JSON.stringify(identificationMap));
+    })
+
     if (!existingSocket) {
         activeSockets[roomID].push(socket.id);
         socket.join(roomID);
         socket.to(roomID).emit("update-user-list", {
             users: [socket.id]
         });
+
+        socket.on("identification", (nickName) => {
+                console.log("Idenfication emission: " + nickName)
+                identificationMap[socket.id] = nickName;
+                console.log(identificationMap);
+                socket.emit("latest-names", JSON.stringify(identificationMap));
+            }
+        )
         socket.on("disconnect", () => {
             activeSockets[roomID] = activeSockets[roomID].filter(
                 existingSocket => existingSocket !== socket.id

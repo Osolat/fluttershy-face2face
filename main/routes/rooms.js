@@ -18,7 +18,9 @@ router.get('/', function (req, res, next) {
             //req.query.password === groupData.(req.query['group-id']).password
             res.cookie('group-id', req.query['group-id']);
             res.cookie('password', req.query.password);
-            res.cookie('name', 'Dummy');
+            if (req.query.name !== undefined) {
+                res.cookie('name', req.query.name);
+            }
             res.status(200).send();
         } else {
             res.status(500).send('Wrong input!');

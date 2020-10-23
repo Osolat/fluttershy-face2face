@@ -11,22 +11,26 @@ textInput.on("keypress", function (event) {
 const peerConnection = new RTCPeerConnection();
 const RTCConnections = {};
 const RTCConnectionsCallStatus = {};
+let RTCConnectionNames = {};
+
 let socket;
 let roomID;
+let nickName = "Anonymous";
 
 function authenticateUser() {
     var cook = document.cookie;
     if (!cook) {
         window.location.replace("..");
     }
-    roomID = cook.split(';');
     for (const splitKey in cook.split(';')) {
-        var splitAroundEq = roomID[splitKey].split('=');
+        var splitAroundEq = cook.split(';')[splitKey].split('=');
         if (splitAroundEq[0].trim() === "group-id") {
             roomID = splitAroundEq[1].trim();
         }
+        if (splitAroundEq[0].trim() === "name") {
+            nickName = splitAroundEq[1].trim();
+        }
     }
-    console.log(roomID);
     const header = document.getElementById("room-header-id");
     header.innerHTML = decodeURI(roomID);
     socket = io.connect(window.location.hostname, {query: {"group-id": roomID}});
@@ -38,7 +42,6 @@ authenticateUser();
 async function bootAndGetSocket() {
     await initLocalStream();
     // TODO: Handle different room IDs.
-
     socket.on('connect', (socket) => {
         console.log("Connected to discovery server through socket.");
     })
@@ -48,9 +51,14 @@ async function bootAndGetSocket() {
         updateUserList(users);
     });
 
+    socket.on("latest-names", (goym) => {
+        RTCConnectionNames = JSON.parse(goym);
+        for (const property in RTCConnectionNames) {
+            console.log(`${property}: ${RTCConnectionNames[property]}`);
+        }
+    });
     socket.on("remove-user", ({socketId}) => {
         const elToRemove = document.getElementById(socketId);
-
         if (elToRemove) {
             elToRemove.remove();
         }
@@ -81,6 +89,7 @@ async function bootAndGetSocket() {
         });
     });
     socket.emit("request-user-list", roomID);
+    socket.emit('identification', nickName);
 }
 
 function castRemoteStreamToFocus(socketId) {
@@ -199,7 +208,7 @@ async function postChatMessage(str) {
      messageFormat.innerHTML = str;
      chatEntryItem.append(tsFormt);
      chatEntryItem.append(messageFormat);*/
-    chatEntryItem.innerHTML = '<p class="timestamp-chat">' + formattedTime + '<span class="chat-message">' + str + '</span>' + '</p>'
+    chatEntryItem.innerHTML = '<p class="timestamp-chat">' + formattedTime + '(' + nickName + ') ' + '<span class="chat-message">' + str + '</span>' + '</p>'
     const chatloglist = document.getElementById("chat-log-list");
     if (chatloglist) {
         chatloglist.appendChild(chatEntryItem);
