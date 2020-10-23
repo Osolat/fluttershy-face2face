@@ -31,6 +31,7 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
 -Nice to have chat commands
 
 # Interesting Links
+- https://users-cs.au.dk/bouvin/dBIoTP2PC/2020/projects/#panzoom
 - https://letsencrypt.org/
     - for certificates etc
 - https://developers.google.com/web/tools/puppeteer/
