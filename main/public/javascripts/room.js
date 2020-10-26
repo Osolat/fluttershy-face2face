@@ -8,6 +8,7 @@ textInput.on("keypress", function (event) {
         postChatMessage(str).then(() => textInput.val(""));
     }
 });
+
 const peerConnection = new RTCPeerConnection();
 const RTCConnections = {};
 const RTCConnectionsCallStatus = {};
