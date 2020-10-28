@@ -51,7 +51,7 @@ io.on("connection", socket => {
                 console.log("Idenfication emission: " + nickName)
                 identificationMap[socket.id] = nickName;
                 console.log(identificationMap);
-                socket.emit("latest-names", JSON.stringify(identificationMap));
+                socket.to(roomID).emit("latest-names", JSON.stringify(identificationMap));
             }
         )
         socket.on("disconnect", () => {

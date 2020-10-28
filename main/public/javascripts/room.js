@@ -8,9 +8,11 @@ textInput.on("keypress", function (event) {
         postChatMessage(str).then(() => textInput.val(""));
     }
 });
+
 const peerConnection = new RTCPeerConnection();
 const RTCConnections = {};
 const RTCConnectionsCallStatus = {};
+var roomConnectionsSet = new Set();
 let RTCConnectionNames = {};
 
 let socket;
@@ -47,7 +49,7 @@ async function bootAndGetSocket() {
     })
 
     socket.on("update-user-list", ({users}) => {
-        console.log("Got 'update-user-list'")
+        console.log("Got 'update-user-list'");
         updateUserList(users);
     });
 
@@ -123,6 +125,7 @@ function initNewRTCConnection(socketId) {
 function updateUserList(socketIds) {
     const activeUserContainer = document.getElementById("active-user-container");
     socketIds.forEach(socketId => {
+        roomConnectionsSet.add(socketId);
         const alreadyExistingUser = document.getElementById(socketId);
         if (!alreadyExistingUser) {
             const userContainerEl = createUserVideoItemContainer(socketId);
