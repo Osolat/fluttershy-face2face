@@ -62,7 +62,7 @@ var RTCConnectionsCallStatus = {};
 var roomConnectionsSet = new Set();
 var activeConnectionSize = 0;
 let RTCConnectionNames = {};
-var isMixingPeer = true;
+var isMixingPeer = false;
 let socket;
 let roomID;
 let nickName = "Anonymous";
@@ -118,7 +118,7 @@ function drawVideoStripe(videoElement, index) {
     var hRatio = (canvasMix.width / videoElement.videoWidth) * videoElement.videoHeight;
     ctxMix.drawImage(videoElement, destLeft, 0, canvasMix.width / (activeConnectionSize + 1), hRatio / (activeConnectionSize + 1));
 
-    ctxMix.fillText('member' + (index + 1), destLeft + 2, destTop + 10);
+    ctxMix.fillText(nickName, destLeft + 2, destTop + 10);
 }
 
 function clickMixCenter(evt) {
