@@ -15,6 +15,7 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
     - Display Shared files (immutable)
     - Download link shows up in chatlogs
 - Chat system
+
 - Support new p2p topologies
     - Find a way to establish 'strong' clients from 'weak' clients
     - Find a way to mash video streams together
