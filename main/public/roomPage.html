@@ -34,10 +34,56 @@
             <h2 class="talk-info" id="talking-with-info">
                 Videofeed
             </h2>
-            <div class="video-container" id="focus-video">
+                
+            <div class="video-container" id="focus-video" style="overflow: scroll;">
                 <!--
                                 <video autoplay class="remote-video" id="remote-video"></video>
                 -->
+                <button class="tablink" onclick="openPage('VideoTab', this, '#65A9E5')" id="defaultOpen" >Video</button>
+                <button class="tablink" onclick="openPage('Document', this, '#65A9E5')" >Document</button>
+                <button class="tablink" onclick="openPage('HomeworkTODO', this, '#65A9E5')">Homework/TODO</button>
+                <button class="tablink" onclick="openPage('Settings', this, '#65A9E5')">Settings</button>
+    
+                <div id="VideoTab" class="tabcontent">
+                </div>
+    
+                <div id="Document" class="tabcontent">
+                    <embed src="pdfs/Cryptography.pdf" width="100%" height="100%" />
+                </div>
+    
+                <div id="HomeworkTODO" class="tabcontent">
+                    <h2>Homework/TODO</h2>
+                    <h3>README:</h3>
+                    <p , contenteditable="true">This is a repository for the P2P course, which aims to implement WebRTC and some P2P architecture to create a collaborative video conference application</p>
+                    <h3>TODO:</h3>
+                    <ul , contenteditable="true">
+                        <li > Need new main page. </li>
+                        <li> Support multiple different callers at once. </li>
+                        <li> Implement file sharing system. </li>
+                        <li> Chat system. </li>
+                        <li> Database for storing chatlogs. </li>
+                        <li> Homework feature. </li>
+                        <li> Meeting schedule. </li>
+                        <li> Display different tabs with content for all users. </li>
+                    </ul>
+                    <h3>Interesting Links:</h3>
+                    <ul>
+                        <li> <a href="https://users-cs.au.dk/bouvin/dBIoTP2PC/2020/projects/#panzoom">https://users-cs.au.dk/bouvin/dBIoTP2PC/2020/projects/#panzoom</a> </li>
+                        <li> <a href="https://letsencrypt.org/">https://letsencrypt.org/ </a> </li>
+                        <li> <a href="https://developers.google.com/web/tools/puppeteer/">https://developers.google.com/web/tools/puppeteer/</a> </li>
+                        <li> <a href="https://alexei-led.github.io/post/pumba_docker_chaos_testing/">https://alexei-led.github.io/post/pumba_docker_chaos_testing/</a> </li>
+                        <li> <a href="https://peertube.dk/ ">https://peertube.dk/ </a> </li>
+                        <li> <a href="https://news.ycombinator.com/item?id=23398261">https://news.ycombinator.com/item?id=23398261 </a> </li>
+                        <li> <a href="https://webtorrent.io/">https://webtorrent.io/ </a> </li>
+                        <li> <a href="https://github.com/webrtc/samples/blob/gh-pages/src/content/peerconnection/multiple/js/main.js">https://github.com/webrtc/samples/blob/gh-pages/src/content/peerconnection/multiple/js/main.js </a> </li>
+                    </ul>        
+                </div>
+    
+                <div id="Settings" class="tabcontent">
+                    <h3>Setting</h3>
+                    <p>Who we are and what we do.</p>
+                </div>
+                
             </div>
             <div class="context-container">
                 <img src="./images/Hat-Waluigi-icon.png" alt="Dummy" class="logo-img" style="height: 100%"/>
