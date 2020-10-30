@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="050014d5-4b2f-4231-9973-8af99a70a4a8" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/main/public/javascripts/room.js" beforeDir="false" afterPath="$PROJECT_DIR$/main/public/javascripts/room.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main/public/roomPage.html" beforeDir="false" afterPath="$PROJECT_DIR$/main/public/roomPage.html" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="JavaScript File" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectId" id="1iSb28MIsOll6iyL4KbkF8j0Doa" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
+    <property name="WebServerToolWindowFactoryState" value="false" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="nodejs_package_manager_path" value="npm" />
+    <property name="vue.rearranger.settings.migration" value="true" />
+  </component>
+  <component name="RunManager">
+    <configuration name="app.js" type="NodeJSConfigurationType" temporary="true" nameIsGenerated="true" path-to-js-file="$PROJECT_DIR$/main/app.js" working-dir="$PROJECT_DIR$/main">
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Node.js.app.js" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="050014d5-4b2f-4231-9973-8af99a70a4a8" name="Default Changelist" comment="" />
+      <created>1601903730538</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1601903730538</updated>
+      <workItem from="1601903731643" duration="1955000" />
+      <workItem from="1602014926209" duration="610000" />
+      <workItem from="1602064843042" duration="9600000" />
+      <workItem from="1602159331257" duration="4196000" />
+      <workItem from="1602237772516" duration="1368000" />
+      <workItem from="1603228419621" duration="1340000" />
+      <workItem from="1603264722696" duration="370000" />
+      <workItem from="1603265238754" duration="2335000" />
+      <workItem from="1603268005315" duration="1387000" />
+      <workItem from="1603270193109" duration="14127000" />
+      <workItem from="1603284907691" duration="1675000" />
+      <workItem from="1603363689951" duration="5653000" />
+      <workItem from="1603661216086" duration="3203000" />
+      <workItem from="1603699866518" duration="2835000" />
+      <workItem from="1603703025473" duration="12907000" />
+      <workItem from="1603818053368" duration="5669000" />
+      <workItem from="1603844183217" duration="836000" />
+      <workItem from="1603878861497" duration="795000" />
+      <workItem from="1603879852372" duration="7952000" />
+      <workItem from="1604053526790" duration="1627000" />
+      <workItem from="1604055278135" duration="3971000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="WindowStateProjectService">
+    <state width="1897" height="281" key="GridCell.Tab.0.bottom" timestamp="1603265745655">
+      <screen x="0" y="25" width="1920" height="1055" />
+    </state>
+    <state width="1897" height="281" key="GridCell.Tab.0.bottom/0.25.1920.1055@0.25.1920.1055" timestamp="1603265745655" />
+    <state width="1897" height="281" key="GridCell.Tab.0.center" timestamp="1603265745654">
+      <screen x="0" y="25" width="1920" height="1055" />
+    </state>
+    <state width="1897" height="281" key="GridCell.Tab.0.center/0.25.1920.1055@0.25.1920.1055" timestamp="1603265745654" />
+    <state width="1897" height="281" key="GridCell.Tab.0.left" timestamp="1603265745653">
+      <screen x="0" y="25" width="1920" height="1055" />
+    </state>
+    <state width="1897" height="281" key="GridCell.Tab.0.left/0.25.1920.1055@0.25.1920.1055" timestamp="1603265745653" />
+    <state width="1897" height="281" key="GridCell.Tab.0.right" timestamp="1603265745654">
+      <screen x="0" y="25" width="1920" height="1055" />
+    </state>
+    <state width="1897" height="281" key="GridCell.Tab.0.right/0.25.1920.1055@0.25.1920.1055" timestamp="1603265745654" />
+    <state x="623" y="255" key="run.anything.popup" timestamp="1602162057235">
+      <screen x="0" y="25" width="1920" height="1055" />
+    </state>
+    <state x="623" y="255" key="run.anything.popup/0.25.1920.1055@0.25.1920.1055" timestamp="1602162057235" />
+    <state x="623" y="258" width="672" height="678" key="search.everywhere.popup" timestamp="1603710182173">
+      <screen x="0" y="25" width="1920" height="1055" />
+    </state>
+    <state x="623" y="258" width="672" height="678" key="search.everywhere.popup/0.25.1920.1055@0.25.1920.1055" timestamp="1603710182173" />
+  </component>
+</project>

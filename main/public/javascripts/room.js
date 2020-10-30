@@ -1,18 +1,28 @@
+import * as filetransfer from './filetransfer-main.js'
+
 //Basic button setup
 const textInput = $("#chat-text-input");
 textInput.on("keypress", function (event) {
     if (event.which === 13 && !event.shiftKey) {
         event.preventDefault();
         const str = textInput.val();
-        postChatMessage(str).then(() => textInput.val(""));
+        sendChatMessage(str).then(() => textInput.val(""));
     }
 });
+
+const sendFileButton = document.querySelector('button#sendFile');
+sendFileButton.addEventListener('click', () => {
+    console.log(dataChannels)
+})
+
 const peerConnection = new RTCPeerConnection();
 const RTCConnections = {};
+const dataChannels = {};
 const RTCConnectionsCallStatus = {};
 
 const socket = io.connect(window.location.hostname);
 bootAndGetSocket().then(r => console.log("Setup finished"));
+
 
 async function bootAndGetSocket() {
     await initLocalStream();
@@ -38,10 +48,18 @@ async function bootAndGetSocket() {
         await RTCConnections[data.socket].setRemoteDescription(
             new RTCSessionDescription(data.answer)
         );
-
         if (!RTCConnectionsCallStatus[data.socket]) {
             callUser(data.socket);
             RTCConnectionsCallStatus[data.socket] = true;
+        }
+        if (!dataChannels[data.socket]) {
+            let newChannel = RTCConnections[data.socket].createDataChannel('sendDataChannel')
+            newChannel.addEventListener('open', filetransfer.onSendChannelStateChange(newChannel));
+            newChannel.addEventListener('close', filetransfer.onSendChannelStateChange(newChannel));
+            newChannel.addEventListener('error', error => console.error('Error in sendChannel:', error));
+            console.log("new channel 1")
+            dataChannels[data.socket] = newChannel;
+            console.log(dataChannels)
         }
     });
 
@@ -50,8 +68,16 @@ async function bootAndGetSocket() {
         await RTCConnections[data.socket].setRemoteDescription(
             new RTCSessionDescription(data.offer)
         );
-        const answer = await RTCConnections[data.socket].createAnswer();
+        const answer = await RTCConnections[data.socket].createAnswer()
         await RTCConnections[data.socket].setLocalDescription(new RTCSessionDescription(answer));
+        RTCConnections[data.socket].addEventListener('datachannel', (event) => {
+            if (!dataChannels[data.socket]) {
+                let dataChannel = event.channel
+                filetransfer.receiveChannelCallback(dataChannel)
+                dataChannels[data.socket] = dataChannel
+            }
+            console.log(dataChannels)
+        })
         socket.emit("make-answer", {
             answer,
             to: data.socket
@@ -155,6 +181,22 @@ function gotStream(stream) {
     const localVideo = document.getElementById("local-video");
     localVideo.srcObject = stream;
     window.localStream = stream;
+}
+
+function sendToAll(data) {
+    for (const [_, dc] of Object.entries(dataChannels)) {
+        dc.send(data)
+    }
+}
+
+function sendChatMessage(str) {
+    let chatData = JSON.stringify({
+        nickname: "Viktor",
+        message: str
+    })
+    console.log(chatData)
+    sendToAll(chatData)
+    postChatMessage(str)
 }
 
 async function postChatMessage(str) {
