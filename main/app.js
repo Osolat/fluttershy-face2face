@@ -7,6 +7,7 @@ var logger = require('morgan');
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
 var favIconRouter = require('./routes/favicon');
+var roomsRouter = require('./routes/rooms');
 
 const port = 80
 var app = express();
@@ -16,33 +17,53 @@ http.listen(port, () => {
 })
 
 const io = require('socket.io')(http);
-activeSockets = [];
+activeSockets = {};
+identificationMap = {};
+
 io.on("connection", socket => {
-    const existingSocket = activeSockets.find(
+    const roomID = socket.handshake.query['group-id'];
+    if (!activeSockets.hasOwnProperty(roomID)) {
+        activeSockets[roomID] = []
+    }
+    const existingSocket = activeSockets[roomID].find(
         existingSocket => existingSocket === socket.id
     );
-    socket.on("request-user-list", () => {
+    socket.on("request-user-list", (id) => {
+        console.log("Id inside request-user-list: " + id);
         socket.emit("update-user-list", {
-            users: activeSockets.filter(
+            users: activeSockets[id].filter(
                 existingSocket => existingSocket !== socket.id
             )
         });
     })
+    socket.on("request-user-names", () => {
+        socket.emit("latest-names", JSON.stringify(identificationMap));
+    })
+
     if (!existingSocket) {
-        activeSockets.push(socket.id);
-        socket.broadcast.emit("update-user-list", {
+        activeSockets[roomID].push(socket.id);
+        socket.join(roomID);
+        socket.to(roomID).emit("update-user-list", {
             users: [socket.id]
         });
+
+        socket.on("identification", (nickName) => {
+                console.log("Idenfication emission: " + nickName)
+                identificationMap[socket.id] = nickName;
+                console.log(identificationMap);
+                socket.to(roomID).emit("latest-names", JSON.stringify(identificationMap));
+            }
+        )
         socket.on("disconnect", () => {
-            activeSockets = activeSockets.filter(
+            activeSockets[roomID] = activeSockets[roomID].filter(
                 existingSocket => existingSocket !== socket.id
             );
-            socket.broadcast.emit("remove-user", {
+            socket.to(roomID).emit("remove-user", {
                 socketId: socket.id
             });
         });
         socket.emit("update-user-list", {
-            users: activeSockets.filter(
+            users: activeSockets[roomID].filter(
                 existingSocket => existingSocket !== socket.id
             )
         });
@@ -73,6 +94,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
+app.use('/rooms', roomsRouter);
 app.use('/favicon.ico', favIconRouter);
 
 // catch 404 and forward to error handler
