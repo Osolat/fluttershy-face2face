@@ -125,12 +125,12 @@
                         <input id="room-psw-input" type="password" autofocus="" placeholder="Enter Room Password"
                                size="29" class="input">
                     </div>
-                    <div id="popup-id-input-buttons">
+                    <div>
                         <button id="join-button-popup" class="button"> JOIN</button>
                     </div>
                 </div>
             </div>
-            <button id="Create-button" class="button"> CREATE</button>
+            <button id="Create-button" class="button"> CREATE ROOM</button>
             <div id="createPopup" class="modal">
                 <!-- Modal content -->
                 <div class="modal-content">
@@ -146,9 +146,9 @@
                     </div>
                     <div id="create-psw-match-input-div">
                         <input id="create-psw-match-input" type="password" autofocus=""
-                               placeholder="Enter Room Password" size="29" class="input">
+                               placeholder="Enter Matching Room Password" size="29" class="input">
                     </div>
-                    <div id="popup-id-input-buttons">
+                    <div>
                         <button id="create-button-popup" class="button"> CREATE</button>
                     </div>
                 </div>
@@ -189,6 +189,7 @@
         let xhr = new XMLHttpRequest();
         let nickname = document.getElementById("room-nickname-input").value;
         var params = "group-id=" + document.getElementById('room-id-input').value + "&password=" + document.getElementById('room-psw-input').value;
+        console.log("Rat");
         if (nickname) {
             params += '&name=' + nickname;
         }
