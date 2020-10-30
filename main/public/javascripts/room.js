@@ -38,9 +38,9 @@ mixStream = canvasMix.captureStream(15);
 animationId = window.requestAnimationFrame(drawCanvas)
 
 //To capture network type (unsupported in many browsers, useless)
-var connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-var type = connection.effectiveType;
-console.log("Connection type changed from " + type + " to " + connection.effectiveType);
+//var connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+//var type = connection.effectiveType;
+//console.log("Connection type changed from " + type + " to " + connection.effectiveType);
 
 // ---- mix video ----
 let videoPositionSet = [];
