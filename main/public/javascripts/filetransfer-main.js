@@ -145,12 +145,6 @@ function receiveChannelCallback(dataChannel) {
 }
 
 
-function onReceiveChatMessageCallback(event) {
-  console.log(`Received Message ${event}`);
-  console.log(event)
-  let chatJSON = JSON.parse(event.data)
-  postChatMessage(chatJSON.message, chatJSON.nickname)
-}
 
 function onReceiveMessageCallback(event) {
   console.log(`Received Message ${event.data}`);
@@ -187,10 +181,12 @@ function onReceiveMessageCallback(event) {
         }
       }
       break;
+    case "SomeSignalType":
+      console.log("Here something should happen if i receive some signal with type=SomeSignal")
+      break;
     default:
       console.log("error: unknown message data type ")
   }
-
 }
 
 function onSendChannelStateChange(sendChannel) {
