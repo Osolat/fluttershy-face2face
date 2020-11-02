@@ -180,7 +180,7 @@ function onReceiveMessageCallback(event) {
   console.log(channel.binarytype)
   if (channel.binaryType == "blob") {
     let chatJSON = JSON.parse(event.data)
-    postChatMessage(chatJSON.message)
+    postChatMessage(chatJSON.message, chatJSON.nickname)
   } else {
     receiveBuffer.push(event.data);
     receivedSize += event.data.byteLength;
@@ -263,7 +263,7 @@ async function displayStats() {
   }
 }
 
-async function postChatMessage(str) {
+async function postChatMessage(str, nickname) {
   console.log("Uploaded message: " + str);
   var ts = Date.now();
   var h = new Date(ts).getHours();
@@ -275,14 +275,7 @@ async function postChatMessage(str) {
 
   var formattedTime = h + ':' + m + ':' + s + "  ";
   const chatEntryItem = document.createElement("li");
-  const tsFormt = document.createElement("p")
-  const messageFormat = document.createElement("p");
-  /* tsFormt.setAttribute("class", "timestamp-chat")
-   tsFormt.innerHTML = formattedTime;
-   messageFormat.innerHTML = str;
-   chatEntryItem.append(tsFormt);
-   chatEntryItem.append(messageFormat);*/
-  chatEntryItem.innerHTML = '<p class="timestamp-chat">' + formattedTime + '<span class="chat-message">' + str + '</span>' + '</p>'
+  chatEntryItem.innerHTML = '<p class="timestamp-chat">' + formattedTime + '(' + nickname + ') ' + '<span class="chat-message">' + str + '</span>' + '</p>'
   const chatloglist = document.getElementById("chat-log-list");
   if (chatloglist) {
     chatloglist.appendChild(chatEntryItem);

@@ -482,6 +482,7 @@ async function bootAndGetSocket() {
             newChannel.addEventListener('open', filetransfer.onSendChannelStateChange(newChannel));
             newChannel.addEventListener('close', filetransfer.onSendChannelStateChange(newChannel));
             newChannel.addEventListener('error', error => console.error('Error in sendChannel:', error));
+            newChannel.addEventListener('message', filetransfer.onReceiveMessageCallback)
             console.log("new channel 1")
             dataChannels[data.socket] = newChannel;
             console.log(dataChannels)
@@ -630,7 +631,7 @@ function sendToAll(data) {
 
 function sendChatMessage(str) {
     let chatData = JSON.stringify({
-        nickname: "Viktor",
+        nickname: nickName,
         message: str
     })
     console.log(chatData)
