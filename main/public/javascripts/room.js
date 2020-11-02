@@ -330,9 +330,6 @@ function openPage(pageName, elmnt, color) {
       element.remove();
   }
   
-  // Get the element with id="defaultOpen" and click on it
-  document.getElementById("defaultOpen").click();
-
   function createButton() {  
     var myDiv = document.getElementById("tabBar");
     var existing = document.getElementById("new");    
