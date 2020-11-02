@@ -10,15 +10,16 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
     - Share links to groups
     - Set password to group?
     
+- (Support new p2p topologies)
+    - Find a way to mash video streams together
 # TODO
 - Implement file sharing system
     - Display Shared files (immutable)
     - Download link shows up in chatlogs
 - Chat system
-
+ 
 - Support new p2p topologies
     - Find a way to establish 'strong' clients from 'weak' clients
-    - Find a way to mash video streams together
     
 - Display different tabs with content for all users
     - Tabs include images, or simple display files
@@ -29,6 +30,7 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
     
 
 - Use auto-merge library to have collabarative text editing
+
 - Database for storing chatlogs
 - Screenshare feature
 - Homework feature 
@@ -39,9 +41,10 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
 - Screenshare feature
 - Stream local video to group/call
 
--Nice to have chat commands
+- Nice to have chat commands
 
 # Interesting Links
+- (For text editing) https://blog.datproject.org/2019/03/05/caracara-react-dat-automerge/
 - https://users-cs.au.dk/bouvin/dBIoTP2PC/2020/projects/#panzoom
 - https://letsencrypt.org/
     - for certificates etc
