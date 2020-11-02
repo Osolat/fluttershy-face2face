@@ -25,6 +25,12 @@ let micNodes = [];
 let outputNodes = [];
 let audioMixSterams = [];
 
+// for filetransfer
+let receiveBuffer = [];
+let receivedSize = 0;
+let statsInterval = null;
+
+
 canvasMix.addEventListener('click', function () {
     audioContext = new window.AudioContext();
     audioContext.resume().then(() => {
@@ -188,9 +194,9 @@ async function bootAndGetSocket() {
         RTCConnections[data.socket].addEventListener('datachannel', (event) => {
             if (!dataChannels[data.socket]) {
                 let dataChannel = event.channel
-                filetransfer.receiveChannelCallback(dataChannel, (event) => {
-
-                })
+                dataChannel.binaryType = 'blob';
+                dataChannel.onmessage = onReceiveMessageCallback;
+                filetransfer.configureChannel(dataChannel)
                 dataChannels[data.socket] = dataChannel
             }
             console.log(dataChannels)
@@ -318,6 +324,48 @@ function gotStream(stream) {
 function sendToAll(data) {
     for (const [_, dc] of Object.entries(dataChannels)) {
         dc.send(data)
+    }
+}
+function onReceiveMessageCallback(event) {
+    console.log(`Received Message ${event.data}`);
+    let data = JSON.parse(event.data)
+    switch (data.type) {
+        case "chat":
+            postChatMessage(data.message, data.nickname)
+            break;
+        case "file":
+            receiveBuffer.push(event.data);
+            receivedSize += event.data.byteLength;
+            receiveProgress.value = receivedSize;
+            // we are assuming that our signaling protocol told
+            // about the expected file size (and name, hash, etc).
+            const file = fileInput.files[0];
+            if (receivedSize === file.size) {
+                const received = new Blob(receiveBuffer);
+                receiveBuffer = [];
+
+                downloadAnchor.href = URL.createObjectURL(received);
+                downloadAnchor.download = file.name;
+                downloadAnchor.textContent =
+                    `Click to download '${file.name}' (${file.size} bytes)`;
+                downloadAnchor.style.display = 'block';
+
+                const bitrate = Math.round(receivedSize * 8 /
+                    ((new Date()).getTime() - timestampStart));
+                bitrateDiv.innerHTML =
+                    `<strong>Average Bitrate:</strong> ${bitrate} kbits/sec (max: ${bitrateMax} kbits/sec)`;
+
+                if (statsInterval) {
+                    clearInterval(statsInterval);
+                    statsInterval = null;
+                }
+            }
+            break;
+        case "SomeSignalType":
+            console.log("Here something should happen if i receive some message with type=SomeSignal")
+            break;
+        default:
+            console.log("error: unknown message data type ")
     }
 }
 
