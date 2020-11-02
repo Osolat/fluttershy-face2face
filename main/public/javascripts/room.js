@@ -343,7 +343,6 @@ function onReceiveMessageCallback(event) {
             if (receivedSize === file.size) {
                 const received = new Blob(receiveBuffer);
                 receiveBuffer = [];
-
                 downloadAnchor.href = URL.createObjectURL(received);
                 downloadAnchor.download = file.name;
                 downloadAnchor.textContent =
@@ -377,10 +376,10 @@ async function sendChatMessage(str) {
     })
     console.log(chatData)
     sendToAll(chatData)
-    postChatMessage(str)
+    postChatMessage(str, nickName)
 }
 
-async function postChatMessage(str) {
+async function postChatMessage(str, nickname) {
     console.log("Uploaded message: " + str);
     var ts = Date.now();
     var h = new Date(ts).getHours();
@@ -392,7 +391,7 @@ async function postChatMessage(str) {
 
     var formattedTime = h + ':' + m + ':' + s + "  ";
     const chatEntryItem = document.createElement("li");
-    chatEntryItem.innerHTML = '<p class="timestamp-chat">' + formattedTime + '(' + nickName + ') ' + '<span class="chat-message">' + str + '</span>' + '</p>'
+    chatEntryItem.innerHTML = '<p class="timestamp-chat">' + formattedTime + '(' + nickname + ') ' + '<span class="chat-message">' + str + '</span>' + '</p>'
     const chatloglist = document.getElementById("chat-log-list");
     if (chatloglist) {
         chatloglist.appendChild(chatEntryItem);
