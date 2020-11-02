@@ -37,6 +37,8 @@ abortButton.addEventListener('click', () => {
   }
 });
 
+sendFileButton.addEventListener('click', )
+
 async function handleFileInputChange() {
   const file = fileInput.files[0];
   if (!file) {
@@ -56,12 +58,7 @@ async function createChannels(...localConnections) {
   await dataChannels.forEach(configureChannel)
 }
 
-function createChannel(obj) {
-  let connection = new RTCPeerConnection();
-  Object.fromEntries(
-      Object.entries(obj).map(
-          ([key, val]) => connection = val )
-  )
+function createChannel(connection) {
   console.log(connection)
   let channel = connection.createDataChannel('sendDataChannel');
   channel.addEventListener('open', onSendChannelStateChange(channel));
@@ -133,7 +130,7 @@ function closeDataChannels() {
 
 function receiveChannelCallback(dataChannel) {
   console.log('Receive Channel Callback');
-  dataChannel.binaryType = 'arraybuffer';
+  dataChannel.binaryType = 'blob';
   dataChannel.onmessage = onReceiveMessageCallback;
   dataChannel.onopen = onReceiveChannelStateChange;
   dataChannel.onclose = onReceiveChannelStateChange;
@@ -156,35 +153,44 @@ function onReceiveChatMessageCallback(event) {
 }
 
 function onReceiveMessageCallback(event) {
-  console.log(`Received Message ${event.data.byteLength}`);
-  receiveBuffer.push(event.data);
-  receivedSize += event.data.byteLength;
-  receiveProgress.value = receivedSize;
-  // we are assuming that our signaling protocol told
-  // about the expected file size (and name, hash, etc).
-  const file = fileInput.files[0];
-  if (receivedSize === file.size) {
-    const received = new Blob(receiveBuffer);
-    receiveBuffer = [];
+  console.log(`Received Message ${event.data}`);
+  let data = JSON.parse(event.data)
+  switch (data.type) {
+    case "chat":
+      postChatMessage(data.message, data.nickname)
+      break;
+    case "file":
+      receiveBuffer.push(event.data);
+      receivedSize += event.data.byteLength;
+      receiveProgress.value = receivedSize;
+      // we are assuming that our signaling protocol told
+      // about the expected file size (and name, hash, etc).
+      const file = fileInput.files[0];
+      if (receivedSize === file.size) {
+        const received = new Blob(receiveBuffer);
+        receiveBuffer = [];
 
-    downloadAnchor.href = URL.createObjectURL(received);
-    downloadAnchor.download = file.name;
-    downloadAnchor.textContent =
-        `Click to download '${file.name}' (${file.size} bytes)`;
-    downloadAnchor.style.display = 'block';
+        downloadAnchor.href = URL.createObjectURL(received);
+        downloadAnchor.download = file.name;
+        downloadAnchor.textContent =
+            `Click to download '${file.name}' (${file.size} bytes)`;
+        downloadAnchor.style.display = 'block';
 
-    const bitrate = Math.round(receivedSize * 8 /
-        ((new Date()).getTime() - timestampStart));
-    bitrateDiv.innerHTML =
-        `<strong>Average Bitrate:</strong> ${bitrate} kbits/sec (max: ${bitrateMax} kbits/sec)`;
+        const bitrate = Math.round(receivedSize * 8 /
+            ((new Date()).getTime() - timestampStart));
+        bitrateDiv.innerHTML =
+            `<strong>Average Bitrate:</strong> ${bitrate} kbits/sec (max: ${bitrateMax} kbits/sec)`;
 
-    if (statsInterval) {
-      clearInterval(statsInterval);
-      statsInterval = null;
-    }
-
-    closeDataChannels();
+        if (statsInterval) {
+          clearInterval(statsInterval);
+          statsInterval = null;
+        }
+      }
+      break;
+    default:
+      console.log("error: unknown message data type ")
   }
+
 }
 
 function onSendChannelStateChange(sendChannel) {
@@ -235,7 +241,7 @@ async function displayStats() {
   }
 }
 
-async function postChatMessage(str, nickname) {
+function postChatMessage(str, nickname) {
   console.log("Uploaded message: " + str);
   var ts = Date.now();
   var h = new Date(ts).getHours();

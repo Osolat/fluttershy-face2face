@@ -321,8 +321,9 @@ function sendToAll(data) {
     }
 }
 
-function sendChatMessage(str) {
+async function sendChatMessage(str) {
     let chatData = JSON.stringify({
+        type: "chat",
         nickname: nickName,
         message: str
     })
