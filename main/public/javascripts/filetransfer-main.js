@@ -37,7 +37,7 @@ abortButton.addEventListener('click', () => {
   }
 });
 
-sendFileButton.addEventListener('click', )
+
 
 async function handleFileInputChange() {
   const file = fileInput.files[0];
@@ -59,12 +59,10 @@ async function createChannels(...localConnections) {
 }
 
 function createChannel(connection) {
-  console.log(connection)
   let channel = connection.createDataChannel('sendDataChannel');
   channel.addEventListener('open', onSendChannelStateChange(channel));
   channel.addEventListener('close', onSendChannelStateChange(channel));
   channel.addEventListener('error', error => console.error('Error in sendChannel:', error));
-  channel.addEventListener('message', onReceiveMessageCallback)
   return channel
 }
 
@@ -150,10 +148,6 @@ function onSendChannelStateChange(sendChannel) {
   const readyState = sendChannel.readyState;
   console.log(`Send channel state is: ${readyState}`);
   console.log(sendChannel)
-  if (sendChannel.readyState === 'open') {
-    console.log("Hello")
-    sendChannel.send("Hello")
-  }
 }
 
 async function onReceiveChannelStateChange(event) {

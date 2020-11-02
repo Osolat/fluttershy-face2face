@@ -179,6 +179,7 @@ async function bootAndGetSocket() {
         }
         if (!dataChannels[data.socket]) {
             let newChannel = filetransfer.createChannel(RTCConnections[data.socket])
+            newChannel.onmessage = onReceiveMessageCallback
             dataChannels[data.socket] = newChannel;
             console.log(dataChannels)
         }
@@ -194,7 +195,6 @@ async function bootAndGetSocket() {
         RTCConnections[data.socket].addEventListener('datachannel', (event) => {
             if (!dataChannels[data.socket]) {
                 let dataChannel = event.channel
-                dataChannel.binaryType = 'blob';
                 dataChannel.onmessage = onReceiveMessageCallback;
                 filetransfer.configureChannel(dataChannel)
                 dataChannels[data.socket] = dataChannel
