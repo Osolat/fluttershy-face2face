@@ -59,29 +59,6 @@ async function createChannels(...localConnections) {
   await dataChannels.forEach(configureChannel)
 }
 
-
-async function awaitChannel(remoteConnection) {
-  console.log(remoteConnection)
-  remoteConnection.addEventListener('datachannel', (event) => {
-    console.log('Received remote data channel')
-    return receiveChannelCallback(event)
-  });
-}
-//function createChannel(obj, index) {
-//  console.log('connection')
-//  console.log(obj)
-//  let connection = new RTCPeerConnection();
-//  Object.fromEntries(
-//      Object.entries(obj).map(
-//          ([key, val]) => connection = val
-//      )
-//  )
-//  console.log(connection)
-//  dataChannels[index] = connection.createDataChannel('sendDataChannel');
-//  curIndex = index;
-//  console.log('Created send data channels')
-//}
-
 function createChannel(obj) {
   let connection = new RTCPeerConnection();
   Object.fromEntries(
@@ -93,6 +70,7 @@ function createChannel(obj) {
   channel.addEventListener('open', onSendChannelStateChange(channel));
   channel.addEventListener('close', onSendChannelStateChange(channel));
   channel.addEventListener('error', error => console.error('Error in sendChannel:', error));
+  channel.addEventListener('message', filetransfer.onReceiveMessageCallback)
   return channel
 }
 

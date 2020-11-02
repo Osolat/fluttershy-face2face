@@ -478,12 +478,7 @@ async function bootAndGetSocket() {
             RTCConnectionsCallStatus[data.socket] = true;
         }
         if (!dataChannels[data.socket]) {
-            let newChannel = RTCConnections[data.socket].createDataChannel('sendDataChannel')
-            newChannel.addEventListener('open', filetransfer.onSendChannelStateChange(newChannel));
-            newChannel.addEventListener('close', filetransfer.onSendChannelStateChange(newChannel));
-            newChannel.addEventListener('error', error => console.error('Error in sendChannel:', error));
-            newChannel.addEventListener('message', filetransfer.onReceiveMessageCallback)
-            console.log("new channel 1")
+            let newChannel = filetransfer.createChannel(RTCConnections[data.socket])
             dataChannels[data.socket] = newChannel;
             console.log(dataChannels)
         }
