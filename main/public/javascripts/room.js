@@ -1,10 +1,12 @@
+import * as filetransfer from './filetransfer-main.js'
+
 //Basic button setup
 const textInput = $("#chat-text-input");
 textInput.on("keypress", function (event) {
     if (event.which === 13 && !event.shiftKey) {
         event.preventDefault();
         const str = textInput.val();
-        postChatMessage(str).then(() => textInput.val(""));
+        sendChatMessage(str).then(() => textInput.val(""));
     }
 });
 
@@ -31,7 +33,14 @@ canvasMix.addEventListener('click', function () {
 });
 
 //Variables for network etc
-const peerConnection = new RTCPeerConnection();
+
+const sendFileButton = document.querySelector('button#sendFile');
+sendFileButton.addEventListener('click', () => {
+    console.log(dataChannels)
+})
+
+const peerConnection = new RTCPeerConnection();;
+const dataChannels = {};
 var RTCConnections = {};
 var RTCConnectionsCallStatus = {};
 var roomConnectionsSet = new Set();
@@ -162,6 +171,11 @@ async function bootAndGetSocket() {
             callUser(data.socket);
             RTCConnectionsCallStatus[data.socket] = true;
         }
+        if (!dataChannels[data.socket]) {
+            let newChannel = filetransfer.createChannel(RTCConnections[data.socket])
+            dataChannels[data.socket] = newChannel;
+            console.log(dataChannels)
+        }
     });
 
     socket.on("call-made", async data => {
@@ -169,8 +183,18 @@ async function bootAndGetSocket() {
         await RTCConnections[data.socket].setRemoteDescription(
             new RTCSessionDescription(data.offer)
         );
-        const answer = await RTCConnections[data.socket].createAnswer();
+        const answer = await RTCConnections[data.socket].createAnswer()
         await RTCConnections[data.socket].setLocalDescription(new RTCSessionDescription(answer));
+        RTCConnections[data.socket].addEventListener('datachannel', (event) => {
+            if (!dataChannels[data.socket]) {
+                let dataChannel = event.channel
+                filetransfer.receiveChannelCallback(dataChannel, (event) => {
+
+                })
+                dataChannels[data.socket] = dataChannel
+            }
+            console.log(dataChannels)
+        })
         socket.emit("make-answer", {
             answer,
             to: data.socket
@@ -291,6 +315,22 @@ function gotStream(stream) {
     }
 }
 
+function sendToAll(data) {
+    for (const [_, dc] of Object.entries(dataChannels)) {
+        dc.send(data)
+    }
+}
+
+function sendChatMessage(str) {
+    let chatData = JSON.stringify({
+        nickname: nickName,
+        message: str
+    })
+    console.log(chatData)
+    sendToAll(chatData)
+    postChatMessage(str)
+}
+
 async function postChatMessage(str) {
     console.log("Uploaded message: " + str);
     var ts = Date.now();
@@ -337,7 +377,7 @@ function createButton() {
     var randLetter = String.fromCharCode(65 + Math.floor(Math.random() * 26));
     var uniqid = randLetter + Date.now()
 
-    // creating button element  
+    // creating button element
     var newTabBut = document.createElement('BUTTON');
     newTabBut.className = 'tablink'
     newTabBut.id = uniqid
