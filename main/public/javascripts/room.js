@@ -322,33 +322,33 @@ function openPage(pageName, elmnt, color) {
     }
     document.getElementById(pageName).style.display = "block";
     elmnt.style.backgroundColor = color;
-  }
+}
 
-  function closePage(elementId){
-      console.log("The id is :" + elementId)
-      var element = document.getElementById(elementId);
-      element.remove();
-  }
-  
-  function createButton() {  
+function closePage(elementId) {
+    console.log("The id is :" + elementId)
+    var element = document.getElementById(elementId);
+    element.remove();
+}
+
+function createButton() {
     var myDiv = document.getElementById("tabBar");
-    var existing = document.getElementById("new");    
+    var existing = document.getElementById("new");
 
     var randLetter = String.fromCharCode(65 + Math.floor(Math.random() * 26));
     var uniqid = randLetter + Date.now()
 
     // creating button element  
-    var newTabBut = document.createElement('BUTTON');     
-    newTabBut.className = 'tablink' 
+    var newTabBut = document.createElement('BUTTON');
+    newTabBut.className = 'tablink'
     newTabBut.id = uniqid
-    newTabBut.onclick = function(){
+    newTabBut.onclick = function () {
         openPage('Settings', this, '#65A9E5')
-      };
-    
+    };
+
     newTabBut.innerHTML = "NewTab <span onclick='closePage(this.parentElement.id)' class='topright'> × </span>"
     newTabBut.contentEditable = 'true'
-    myDiv.insertBefore(newTabBut, existing);  
-}  
+    myDiv.insertBefore(newTabBut, existing);
+}
 
 
 // Get the element with id="defaultOpen" and click on it
