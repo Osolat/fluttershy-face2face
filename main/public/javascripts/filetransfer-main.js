@@ -1,9 +1,7 @@
 export{
   createChannels,
   createChannel,
-  awaitChannel,
   onSendChannelStateChange,
-  onReceiveMessageCallback,
   receiveChannelCallback,
 }
 
@@ -12,7 +10,6 @@ export{
 let remoteConnection;
 let dataChannels = [];
 let fileReader;
-let curIndex;
 const bitrateDiv = document.querySelector('div#bitrate');
 const fileInput = document.querySelector('input#fileInput');
 const abortButton = document.querySelector('button#abortButton');
@@ -70,7 +67,7 @@ function createChannel(obj) {
   channel.addEventListener('open', onSendChannelStateChange(channel));
   channel.addEventListener('close', onSendChannelStateChange(channel));
   channel.addEventListener('error', error => console.error('Error in sendChannel:', error));
-  channel.addEventListener('message', filetransfer.onReceiveMessageCallback)
+  channel.addEventListener('message', onReceiveMessageCallback)
   return channel
 }
 
@@ -136,7 +133,7 @@ function closeDataChannels() {
 
 function receiveChannelCallback(dataChannel) {
   console.log('Receive Channel Callback');
-  //dataChannel.binaryType = 'arraybuffer';
+  dataChannel.binaryType = 'arraybuffer';
   dataChannel.onmessage = onReceiveMessageCallback;
   dataChannel.onopen = onReceiveChannelStateChange;
   dataChannel.onclose = onReceiveChannelStateChange;
@@ -151,46 +148,43 @@ function receiveChannelCallback(dataChannel) {
 }
 
 
-function onReceiveMessageCallback(event) {
+function onReceiveChatMessageCallback(event) {
   console.log(`Received Message ${event}`);
   console.log(event)
-  let channel = event.originalTarget;
-  console.log(channel.binarytype)
-  if (channel.binaryType == "blob") {
-    let chatJSON = JSON.parse(event.data)
-    postChatMessage(chatJSON.message, chatJSON.nickname)
-  } else {
-    receiveBuffer.push(event.data);
-    receivedSize += event.data.byteLength;
+  let chatJSON = JSON.parse(event.data)
+  postChatMessage(chatJSON.message, chatJSON.nickname)
+}
 
-    receiveProgress.value = receivedSize;
+function onReceiveMessageCallback(event) {
+  console.log(`Received Message ${event.data.byteLength}`);
+  receiveBuffer.push(event.data);
+  receivedSize += event.data.byteLength;
+  receiveProgress.value = receivedSize;
+  // we are assuming that our signaling protocol told
+  // about the expected file size (and name, hash, etc).
+  const file = fileInput.files[0];
+  if (receivedSize === file.size) {
+    const received = new Blob(receiveBuffer);
+    receiveBuffer = [];
 
-    // we are assuming that our signaling protocol told
-    // about the expected file size (and name, hash, etc).
-    const file = fileInput.files[0];
-    if (receivedSize === file.size) {
-      const received = new Blob(receiveBuffer);
-      receiveBuffer = [];
+    downloadAnchor.href = URL.createObjectURL(received);
+    downloadAnchor.download = file.name;
+    downloadAnchor.textContent =
+        `Click to download '${file.name}' (${file.size} bytes)`;
+    downloadAnchor.style.display = 'block';
 
-      downloadAnchor.href = URL.createObjectURL(received);
-      downloadAnchor.download = file.name;
-      downloadAnchor.textContent =
-          `Click to download '${file.name}' (${file.size} bytes)`;
-      downloadAnchor.style.display = 'block';
+    const bitrate = Math.round(receivedSize * 8 /
+        ((new Date()).getTime() - timestampStart));
+    bitrateDiv.innerHTML =
+        `<strong>Average Bitrate:</strong> ${bitrate} kbits/sec (max: ${bitrateMax} kbits/sec)`;
 
-      const bitrate = Math.round(receivedSize * 8 /
-          ((new Date()).getTime() - timestampStart));
-      bitrateDiv.innerHTML =
-          `<strong>Average Bitrate:</strong> ${bitrate} kbits/sec (max: ${bitrateMax} kbits/sec)`;
-
-      if (statsInterval) {
-        clearInterval(statsInterval);
-        statsInterval = null;
-      }
+    if (statsInterval) {
+      clearInterval(statsInterval);
+      statsInterval = null;
     }
+
+    closeDataChannels();
   }
-    //closeDataChannels();
-  return ''
 }
 
 function onSendChannelStateChange(sendChannel) {

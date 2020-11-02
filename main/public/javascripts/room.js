@@ -494,7 +494,9 @@ async function bootAndGetSocket() {
         RTCConnections[data.socket].addEventListener('datachannel', (event) => {
             if (!dataChannels[data.socket]) {
                 let dataChannel = event.channel
-                filetransfer.receiveChannelCallback(dataChannel)
+                filetransfer.receiveChannelCallback(dataChannel, (event) => {
+
+                })
                 dataChannels[data.socket] = dataChannel
             }
             console.log(dataChannels)
