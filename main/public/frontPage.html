@@ -114,7 +114,7 @@
                     <p id="instruction">Please enter a room ID.</p>
                     <div id="room-id-input-div" position="absolute">
                         <input id="room-id-input" type=text autofocus="" placeholder="Enter Room ID" class="input"
-                               size="29" onkeyup='check();'>
+                               size="29">
                         <span id='message'></span>
                     </div>
                     <div id="room-nickname-input-div">
@@ -126,7 +126,7 @@
                                size="29" class="input">
                     </div>
                     <div>
-                        <button id="join-button-popup" class="button"> JOIN</button>
+                        <button id="join-button-popup" class="button"> ENTER</button>
                     </div>
                 </div>
             </div>
@@ -189,7 +189,6 @@
         let xhr = new XMLHttpRequest();
         let nickname = document.getElementById("room-nickname-input").value;
         var params = "group-id=" + document.getElementById('room-id-input').value + "&password=" + document.getElementById('room-psw-input').value;
-        console.log("Rat");
         if (nickname) {
             params += '&name=' + nickname;
         }
