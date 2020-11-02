@@ -1,5 +1,4 @@
 //Basic button setup
-
 const textInput = $("#chat-text-input");
 textInput.on("keypress", function (event) {
     if (event.which === 13 && !event.shiftKey) {
@@ -9,15 +8,97 @@ textInput.on("keypress", function (event) {
     }
 });
 
-const peerConnection = new RTCPeerConnection();
-const RTCConnections = {};
-const RTCConnectionsCallStatus = {};
-var roomConnectionsSet = new Set();
-let RTCConnectionNames = {};
+//For mixing
+let canvasMix = document.getElementById('mix-canvas');
+let ctxMix = canvasMix.getContext('2d');
+let tallestVid = 0;
+let widestVid = 0;
+ctxMix.fillStyle = 'rgb(128, 192, 128)';
+let mixStream = null;
+let animationId = null;
 
+// for audio
+let audioContext;
+let micNodes = [];
+let outputNodes = [];
+let audioMixSterams = [];
+
+canvasMix.addEventListener('click', function () {
+    audioContext = new window.AudioContext();
+    audioContext.resume().then(() => {
+        console.log('Playback resumed successfully');
+    });
+});
+
+//Variables for network etc
+const peerConnection = new RTCPeerConnection();
+var RTCConnections = {};
+var RTCConnectionsCallStatus = {};
+var roomConnectionsSet = new Set();
+var activeConnectionSize = 0;
+let RTCConnectionNames = {};
+var isMixingPeer = false;
 let socket;
 let roomID;
 let nickName = "Anonymous";
+
+// mixed video stream
+if (isMixingPeer) {
+    mixStream = canvasMix.captureStream(15);
+    animationId = window.requestAnimationFrame(drawCanvas)
+}
+
+function drawCanvas() {
+    drawCanvasStripe();
+    // animation frame will be drop down, when window is hidden.
+    animationId = window.requestAnimationFrame(drawCanvas);
+}
+
+function drawCanvasStripe() {
+    let index = 1;
+    const localVideo = document.getElementById("local-video");
+    drawVideoStripe(localVideo, 0, "-1");
+    let remoteVid;
+    for (var key in RTCConnections) {
+        remoteVid = document.getElementById(key);
+        if (remoteVid) {
+            drawVideoStripe(remoteVid, index, key);
+            index++;
+        }
+    }
+}
+
+function drawVideoStripe(videoElement, index, memberSocket) {
+    /*let srcLeft = videoElement.videoWidth * (3.0 / 8.0);
+    let srcTop = 0;
+    let srcWidth = videoElement.videoWidth;
+    let srcHeight = videoElement.videoHeight;
+    let destWidth = mixWidth / (activeConnectionSize + 1);
+    let destHeight = mixHeight / (activeConnectionSize + 1);*/
+    let destLeft = canvasMix.width / (activeConnectionSize + 1) * index;
+    let destTop = 0;
+    if (videoElement.videoHeight > tallestVid) {
+        tallestVid = videoElement.videoHeight;
+    }
+    if (videoElement.videoWidth > widestVid) {
+        widestVid = videoElement.videoWidth;
+    }
+
+    /*
+        ctxMix.drawImage(videoElement, destLeft, destTop, destWidth, destHeight);
+    */
+    // fill horizontally
+    var hRatio = (canvasMix.width / videoElement.videoWidth) * videoElement.videoHeight;
+
+    ctxMix.drawImage(videoElement, destLeft, 0, canvasMix.width / (activeConnectionSize + 1), hRatio / (activeConnectionSize + 1));
+    if (memberSocket === "-1") {
+        ctxMix.fillText(nickName, destLeft + 2, destTop + 10);
+
+    } else {
+        ctxMix.fillText(RTCConnectionNames[memberSocket], destLeft + 2, destTop + 10);
+    }
+
+}
 
 function authenticateUser() {
     var cook = document.cookie;
@@ -55,13 +136,18 @@ async function bootAndGetSocket() {
 
     socket.on("latest-names", (goym) => {
         RTCConnectionNames = JSON.parse(goym);
-        for (const property in RTCConnectionNames) {
+        for (const property in RTCConnections) {
             console.log(`${property}: ${RTCConnectionNames[property]}`);
         }
     });
     socket.on("remove-user", ({socketId}) => {
         const elToRemove = document.getElementById(socketId);
         if (elToRemove) {
+            delete RTCConnections[socketId];
+            activeConnectionSize--;
+            delete RTCConnectionsCallStatus[socketId];
+            delete RTCConnectionNames[socketId];
+            roomConnectionsSet.delete(socketId);
             elToRemove.remove();
         }
     });
@@ -92,6 +178,7 @@ async function bootAndGetSocket() {
     });
     socket.emit("request-user-list", roomID);
     socket.emit('identification', nickName);
+    socket.emit("request-user-names");
 }
 
 function castRemoteStreamToFocus(socketId) {
@@ -118,8 +205,17 @@ function initNewRTCConnection(socketId) {
         }
     };
     RTCConnections[socketId] = rtcConnection;
+    activeConnectionSize++;
     RTCConnectionsCallStatus[socketId] = false;
-    window.localStream.getTracks().forEach(track => rtcConnection.addTrack(track, window.localStream));
+    if (isMixingPeer) {
+        window.localStream.getTracks().forEach(track => rtcConnection.addTrack(track, mixStream));
+    } else {
+        window.localStream.getTracks().forEach(track => rtcConnection.addTrack(track, window.localStream));
+    }
+    ctxMix.beginPath();
+    ctxMix.rect(0, 0, widestVid, tallestVid);
+    ctxMix.fillStyle = "black";
+    ctxMix.fill();
 }
 
 function updateUserList(socketIds) {
@@ -190,6 +286,9 @@ function gotStream(stream) {
     const localVideo = document.getElementById("local-video");
     localVideo.srcObject = stream;
     window.localStream = stream;
+    if (isMixingPeer) {
+        window.localStream = mixStream;
+    }
 }
 
 async function postChatMessage(str) {
@@ -204,13 +303,6 @@ async function postChatMessage(str) {
 
     var formattedTime = h + ':' + m + ':' + s + "  ";
     const chatEntryItem = document.createElement("li");
-    const tsFormt = document.createElement("p")
-    const messageFormat = document.createElement("p");
-    /* tsFormt.setAttribute("class", "timestamp-chat")
-     tsFormt.innerHTML = formattedTime;
-     messageFormat.innerHTML = str;
-     chatEntryItem.append(tsFormt);
-     chatEntryItem.append(messageFormat);*/
     chatEntryItem.innerHTML = '<p class="timestamp-chat">' + formattedTime + '(' + nickName + ') ' + '<span class="chat-message">' + str + '</span>' + '</p>'
     const chatloglist = document.getElementById("chat-log-list");
     if (chatloglist) {
@@ -218,15 +310,15 @@ async function postChatMessage(str) {
     }
 }
 
-function openPage(pageName,elmnt,color) {
+function openPage(pageName, elmnt, color) {
     var i, tabcontent, tablinks;
     tabcontent = document.getElementsByClassName("tabcontent");
     for (i = 0; i < tabcontent.length; i++) {
-      tabcontent[i].style.display = "none";
+        tabcontent[i].style.display = "none";
     }
     tablinks = document.getElementsByClassName("tablink");
     for (i = 0; i < tablinks.length; i++) {
-      tablinks[i].style.backgroundColor = "";
+        tablinks[i].style.backgroundColor = "";
     }
     document.getElementById(pageName).style.display = "block";
     elmnt.style.backgroundColor = color;
@@ -260,3 +352,50 @@ function openPage(pageName,elmnt,color) {
     newTabBut.contentEditable = 'true'
     myDiv.insertBefore(newTabBut, existing);  
 }  
+
+
+// Get the element with id="defaultOpen" and click on it
+document.getElementById("defaultOpen").click();
+
+dragElement(document.getElementById("local-video"));
+
+function dragElement(elmnt) {
+    var pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+    if (document.getElementById(elmnt.id + "header")) {
+        // if present, the header is where you move the DIV from:
+        document.getElementById(elmnt.id + "header").onmousedown = dragMouseDown;
+    } else {
+        // otherwise, move the DIV from anywhere inside the DIV:
+        elmnt.onmousedown = dragMouseDown;
+    }
+
+    function dragMouseDown(e) {
+        e = e || window.event;
+        e.preventDefault();
+        // get the mouse cursor position at startup:
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        document.onmouseup = closeDragElement;
+        // call a function whenever the cursor moves:
+        document.onmousemove = elementDrag;
+    }
+
+    function elementDrag(e) {
+        e = e || window.event;
+        e.preventDefault();
+        // calculate the new cursor position:
+        pos1 = pos3 - e.clientX;
+        pos2 = pos4 - e.clientY;
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        // set the element's new position:
+        elmnt.style.top = (elmnt.offsetTop - pos2) + "px";
+        elmnt.style.left = (elmnt.offsetLeft - pos1) + "px";
+    }
+
+    function closeDragElement() {
+        // stop moving when mouse button is released:
+        document.onmouseup = null;
+        document.onmousemove = null;
+    }
+}

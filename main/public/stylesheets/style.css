@@ -132,6 +132,10 @@ body {
     margin: 0;
 }
 
+#mix-canvas {
+    width: 100%;
+    height: 100%;
+}
 #chat-text-input {
     width: 90%;
 }
@@ -175,6 +179,7 @@ body {
 
 .local-video {
     position: absolute;
+    cursor: move;
     border: 3px solid #4279a9;
     top: 5px;
     right: 5px;
