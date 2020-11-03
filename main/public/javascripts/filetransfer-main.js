@@ -1,8 +1,8 @@
-export{
-  createChannel,
-  onSendChannelStateChange,
-  receiveChannelCallback,
-  configureChannel,
+export {
+    createChannel,
+    onSendChannelStateChange,
+    receiveChannelCallback,
+    configureChannel,
 }
 
 'use strict';
@@ -31,179 +31,177 @@ let bitrateMax = 0;
 
 fileInput.addEventListener('change', handleFileInputChange, false);
 abortButton.addEventListener('click', () => {
-  if (fileReader && fileReader.readyState === 1) {
-    console.log('Abort read!');
-    fileReader.abort();
-  }
+    if (fileReader && fileReader.readyState === 1) {
+        console.log('Abort read!');
+        fileReader.abort();
+    }
 });
 
 
-
 async function handleFileInputChange() {
-  const file = fileInput.files[0];
-  if (!file) {
-    console.log('No file chosen');
-  } else {
-    sendFileButton.disabled = false;
-  }
+    const file = fileInput.files[0];
+    if (!file) {
+        console.log('No file chosen');
+    } else {
+        sendFileButton.disabled = false;
+    }
 }
 
 async function createChannels(...localConnections) {
-  console.log(localConnections)
-  abortButton.disabled = false;
-  sendFileButton.disabled = true;
-  localConnections.forEach(createChannel)
-  console.log(localConnections)
-  console.log(dataChannels)
-  await dataChannels.forEach(configureChannel)
+    console.log(localConnections)
+    abortButton.disabled = false;
+    sendFileButton.disabled = true;
+    localConnections.forEach(createChannel)
+    console.log(localConnections)
+    console.log(dataChannels)
+    await dataChannels.forEach(configureChannel)
 }
 
 function createChannel(connection) {
-  let channel = connection.createDataChannel('sendDataChannel');
-  channel.addEventListener('open', onSendChannelStateChange(channel));
-  channel.addEventListener('close', onSendChannelStateChange(channel));
-  channel.addEventListener('error', error => console.error('Error in sendChannel:', error));
-  return channel
+    let channel = connection.createDataChannel('sendDataChannel');
+    console.log("Channel in create: " + channel)
+    channel.addEventListener('open', onSendChannelStateChange(channel));
+    channel.addEventListener('close', onSendChannelStateChange(channel));
+    channel.addEventListener('error', error => console.error('Error in sendChannel:', error));
+    return channel
 }
 
-async function configureChannel(dataChannel){
-  dataChannel.binaryType = 'blob'
-  dataChannel.addEventListener('open', onSendChannelStateChange(dataChannel));
-  dataChannel.addEventListener('close', onSendChannelStateChange(dataChannel));
-  dataChannel.addEventListener('error', error => console.error('Error in sendChannel:', error));
+async function configureChannel(dataChannel) {
+    dataChannel.binaryType = 'arraybuffer'
+    dataChannel.addEventListener('open', onSendChannelStateChange(dataChannel));
+    dataChannel.addEventListener('close', onSendChannelStateChange(dataChannel));
+    dataChannel.addEventListener('error', error => console.error('Error in sendChannel:', error));
 }
 
 function sendData() {
-  const file = fileInput.files[0];
-  console.log(`File is ${[file.name, file.size, file.type, file.lastModified].join(' ')}`);
+    const file = fileInput.files[0];
+    console.log(`File is ${[file.name, file.size, file.type, file.lastModified].join(' ')}`);
 
-  // Handle 0 size files.
-  statusMessage.textContent = '';
-  downloadAnchor.textContent = '';
-  if (file.size === 0) {
-    bitrateDiv.innerHTML = '';
-    statusMessage.textContent = 'File is empty, please select a non-empty file';
-    closeDataChannels();
-    return;
-  }
-  sendProgress.max = file.size;
-  receiveProgress.max = file.size;
-  const chunkSize = 16384;
-  fileReader = new FileReader();
-  let offset = 0;
-  fileReader.addEventListener('error', error => console.error('Error reading file:', error));
-  fileReader.addEventListener('abort', event => console.log('File reading aborted:', event));
-  fileReader.addEventListener('load', e => {
-    console.log('FileRead.onload ', e);
-    sendChannel.send(e.target.result);
-    offset += e.target.result.byteLength;
-    sendProgress.value = offset;
-    if (offset < file.size) {
-      readSlice(offset);
+    // Handle 0 size files.
+    statusMessage.textContent = '';
+    downloadAnchor.textContent = '';
+    if (file.size === 0) {
+        bitrateDiv.innerHTML = '';
+        statusMessage.textContent = 'File is empty, please select a non-empty file';
+        closeDataChannels();
+        return;
     }
-  });
-  const readSlice = o => {
-    console.log('readSlice ', o);
-    const slice = file.slice(offset, o + chunkSize);
-    fileReader.readAsArrayBuffer(slice);
-  };
-  readSlice(0);
+    sendProgress.max = file.size;
+    receiveProgress.max = file.size;
+    const chunkSize = 16384;
+    fileReader = new FileReader();
+    let offset = 0;
+    fileReader.addEventListener('error', error => console.error('Error reading file:', error));
+    fileReader.addEventListener('abort', event => console.log('File reading aborted:', event));
+    fileReader.addEventListener('load', e => {
+        console.log('FileRead.onload ', e);
+        sendChannel.send(e.target.result);
+        offset += e.target.result.byteLength;
+        sendProgress.value = offset;
+        if (offset < file.size) {
+            readSlice(offset);
+        }
+    });
+    const readSlice = o => {
+        console.log('readSlice ', o);
+        const slice = file.slice(offset, o + chunkSize);
+        fileReader.readAsArrayBuffer(slice);
+    };
+    readSlice(0);
 }
 
 function closeDataChannels() {
-  console.log('Closing data channels');
-  sendChannel.close();
-  console.log(`Closed data channel with label: ${sendChannel.label}`);
-  if (receiveChannel) {
-    receiveChannel.close();
-    console.log(`Closed data channel with label: ${receiveChannel.label}`);
-  }
-  // re-enable the file select
-  fileInput.disabled = false;
-  abortButton.disabled = true;
-  sendFileButton.disabled = false;
+    console.log('Closing data channels');
+    sendChannel.close();
+    console.log(`Closed data channel with label: ${sendChannel.label}`);
+    if (receiveChannel) {
+        receiveChannel.close();
+        console.log(`Closed data channel with label: ${receiveChannel.label}`);
+    }
+    // re-enable the file select
+    fileInput.disabled = false;
+    abortButton.disabled = true;
+    sendFileButton.disabled = false;
 }
 
 
 function receiveChannelCallback(dataChannel) {
-  console.log('Receive Channel Callback');
-  dataChannel.binaryType = 'blob';
-  dataChannel.onmessage = onReceiveMessageCallback;
-  dataChannel.onopen = onReceiveChannelStateChange;
-  dataChannel.onclose = onReceiveChannelStateChange;
-  receivedSize = 0;
-  bitrateMax = 0;
-  downloadAnchor.textContent = '';
-  downloadAnchor.removeAttribute('download');
-  if (downloadAnchor.href) {
-    URL.revokeObjectURL(downloadAnchor.href);
-    downloadAnchor.removeAttribute('href');
-  }
+    console.log('Receive Channel Callback');
+    dataChannel.binaryType = 'blob';
+    dataChannel.onmessage = onReceiveMessageCallback;
+    dataChannel.onopen = onReceiveChannelStateChange;
+    dataChannel.onclose = onReceiveChannelStateChange;
+    receivedSize = 0;
+    bitrateMax = 0;
+    downloadAnchor.textContent = '';
+    downloadAnchor.removeAttribute('download');
+    if (downloadAnchor.href) {
+        URL.revokeObjectURL(downloadAnchor.href);
+        downloadAnchor.removeAttribute('href');
+    }
 }
-
-
 
 
 function onSendChannelStateChange(sendChannel) {
-  const readyState = sendChannel.readyState;
-  console.log(`Send channel state is: ${readyState}`);
-  console.log(sendChannel)
+    const readyState = sendChannel.readyState;
+    console.log(`Send channel state is: ${readyState}`);
+    console.log(sendChannel)
 }
 
 async function onReceiveChannelStateChange(event) {
-  console.log(event)
-  if (event.type === 'open') {
-    timestampStart = (new Date()).getTime();
-    timestampPrev = timestampStart;
-    //statsInterval = setInterval(displayStats, 500);
-    //await displayStats();
-  }
+    console.log(event)
+    if (event.type === 'open') {
+        timestampStart = (new Date()).getTime();
+        timestampPrev = timestampStart;
+        //statsInterval = setInterval(displayStats, 500);
+        //await displayStats();
+    }
 }
 
 // display bitrate statistics.
 async function displayStats() {
-  if (remoteConnection && remoteConnection.iceConnectionState === 'connected') {
-    const stats = await remoteConnection.getStats();
-    let activeCandidatePair;
-    stats.forEach(report => {
-      if (report.type === 'transport') {
-        activeCandidatePair = stats.get(report.selectedCandidatePairId);
-      }
-    });
-    if (activeCandidatePair) {
-      if (timestampPrev === activeCandidatePair.timestamp) {
-        return;
-      }
-      // calculate current bitrate
-      const bytesNow = activeCandidatePair.bytesReceived;
-      const bitrate = Math.round((bytesNow - bytesPrev) * 8 /
-        (activeCandidatePair.timestamp - timestampPrev));
-      bitrateDiv.innerHTML = `<strong>Current Bitrate:</strong> ${bitrate} kbits/sec`;
-      timestampPrev = activeCandidatePair.timestamp;
-      bytesPrev = bytesNow;
-      if (bitrate > bitrateMax) {
-        bitrateMax = bitrate;
-      }
+    if (remoteConnection && remoteConnection.iceConnectionState === 'connected') {
+        const stats = await remoteConnection.getStats();
+        let activeCandidatePair;
+        stats.forEach(report => {
+            if (report.type === 'transport') {
+                activeCandidatePair = stats.get(report.selectedCandidatePairId);
+            }
+        });
+        if (activeCandidatePair) {
+            if (timestampPrev === activeCandidatePair.timestamp) {
+                return;
+            }
+            // calculate current bitrate
+            const bytesNow = activeCandidatePair.bytesReceived;
+            const bitrate = Math.round((bytesNow - bytesPrev) * 8 /
+                (activeCandidatePair.timestamp - timestampPrev));
+            bitrateDiv.innerHTML = `<strong>Current Bitrate:</strong> ${bitrate} kbits/sec`;
+            timestampPrev = activeCandidatePair.timestamp;
+            bytesPrev = bytesNow;
+            if (bitrate > bitrateMax) {
+                bitrateMax = bitrate;
+            }
+        }
     }
-  }
 }
 
 function postChatMessage(str, nickname) {
-  console.log("Uploaded message: " + str);
-  var ts = Date.now();
-  var h = new Date(ts).getHours();
-  var m = new Date(ts).getMinutes();
-  var s = new Date(ts).getSeconds();
-  h = (h < 10) ? '0' + h : h;
-  m = (m < 10) ? '0' + m : m;
-  s = (s < 10) ? '0' + s : s;
+    console.log("Uploaded message: " + str);
+    var ts = Date.now();
+    var h = new Date(ts).getHours();
+    var m = new Date(ts).getMinutes();
+    var s = new Date(ts).getSeconds();
+    h = (h < 10) ? '0' + h : h;
+    m = (m < 10) ? '0' + m : m;
+    s = (s < 10) ? '0' + s : s;
 
-  var formattedTime = h + ':' + m + ':' + s + "  ";
-  const chatEntryItem = document.createElement("li");
-  chatEntryItem.innerHTML = '<p class="timestamp-chat">' + formattedTime + '(' + nickname + ') ' + '<span class="chat-message">' + str + '</span>' + '</p>'
-  const chatloglist = document.getElementById("chat-log-list");
-  if (chatloglist) {
-    chatloglist.appendChild(chatEntryItem);
-  }
+    var formattedTime = h + ':' + m + ':' + s + "  ";
+    const chatEntryItem = document.createElement("li");
+    chatEntryItem.innerHTML = '<p class="timestamp-chat">' + formattedTime + '(' + nickname + ') ' + '<span class="chat-message">' + str + '</span>' + '</p>'
+    const chatloglist = document.getElementById("chat-log-list");
+    if (chatloglist) {
+        chatloglist.appendChild(chatEntryItem);
+    }
 }
 

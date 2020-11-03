@@ -45,7 +45,8 @@ sendFileButton.addEventListener('click', () => {
     console.log(dataChannels)
 })
 
-const peerConnection = new RTCPeerConnection();;
+const peerConnection = new RTCPeerConnection();
+;
 const dataChannels = {};
 var RTCConnections = {};
 var RTCConnectionsCallStatus = {};
@@ -155,6 +156,7 @@ async function bootAndGetSocket() {
             console.log(`${property}: ${RTCConnectionNames[property]}`);
         }
     });
+
     socket.on("remove-user", ({socketId}) => {
         const elToRemove = document.getElementById(socketId);
         if (elToRemove) {
@@ -168,21 +170,21 @@ async function bootAndGetSocket() {
     });
 
     socket.on("answer-made", async data => {
-        console.log("Got 'answer-made'")
+        console.log("Got 'answer-made': " + data.socket)
         await RTCConnections[data.socket].setRemoteDescription(
             new RTCSessionDescription(data.answer)
         );
-
-        if (!RTCConnectionsCallStatus[data.socket]) {
-            callUser(data.socket);
-            RTCConnectionsCallStatus[data.socket] = true;
-        }
         if (!dataChannels[data.socket]) {
             let newChannel = filetransfer.createChannel(RTCConnections[data.socket])
             newChannel.onmessage = onReceiveMessageCallback
             dataChannels[data.socket] = newChannel;
             console.log(dataChannels)
         }
+        if (!RTCConnectionsCallStatus[data.socket]) {
+            callUser(data.socket);
+            RTCConnectionsCallStatus[data.socket] = true;
+        }
+
     });
 
     socket.on("call-made", async data => {
@@ -192,15 +194,25 @@ async function bootAndGetSocket() {
         );
         const answer = await RTCConnections[data.socket].createAnswer()
         await RTCConnections[data.socket].setLocalDescription(new RTCSessionDescription(answer));
+
         RTCConnections[data.socket].addEventListener('datachannel', (event) => {
             if (!dataChannels[data.socket]) {
-                let dataChannel = event.channel
+                let dataChannel = event.channel || event;
                 dataChannel.onmessage = onReceiveMessageCallback;
                 filetransfer.configureChannel(dataChannel)
                 dataChannels[data.socket] = dataChannel
             }
             console.log(dataChannels)
         })
+        RTCConnections[data.socket].ondatachannel = (event) => {
+            if (!dataChannels[data.socket]) {
+                let dataChannel = event.channel || event;
+                dataChannel.onmessage = onReceiveMessageCallback;
+                filetransfer.configureChannel(dataChannel)
+                dataChannels[data.socket] = dataChannel
+            }
+            console.log(dataChannels)
+        }
         socket.emit("make-answer", {
             answer,
             to: data.socket
@@ -326,6 +338,7 @@ function sendToAll(data) {
         dc.send(data)
     }
 }
+
 function onReceiveMessageCallback(event) {
     console.log(`Received Message ${event.data}`);
     let data = JSON.parse(event.data)
