@@ -45,6 +45,9 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
 
 - Nice to have chat commands
 
+- Tracking of netowrk activity for topology / visuel representation of network for debugging/presentation (graph)
+
+
 # Interesting Links
 - (For text editing) https://blog.datproject.org/2019/03/05/caracara-react-dat-automerge/
 - https://users-cs.au.dk/bouvin/dBIoTP2PC/2020/projects/#panzoom
