@@ -45,15 +45,13 @@ sendFileButton.addEventListener('click', () => {
     console.log(dataChannels)
 })
 
-const peerConnection = new RTCPeerConnection();
-;
 const dataChannels = {};
 var RTCConnections = {};
 var RTCConnectionsCallStatus = {};
 var roomConnectionsSet = new Set();
 var activeConnectionSize = 0;
 let RTCConnectionNames = {};
-var isMixingPeer = false;
+var isMixingPeer = true;
 let socket;
 let roomID;
 let nickName = "Anonymous";
@@ -373,12 +371,23 @@ function onReceiveMessageCallback(event) {
                 }
             }
             break;
+        case "mixerSignal":
+            console.log("Got mixer signal from: " + data.origin);
+            break;
         case "SomeSignalType":
             console.log("Here something should happen if i receive some message with type=SomeSignal")
             break;
         default:
-            console.log("error: unknown message data type ")
+            console.log("error: unknown message data type or malformed JSON format")
     }
+}
+
+async function sendMixerSignal() {
+    let data = {
+        type: "mixerSignal",
+        origin: socket.id
+    }
+    sendToAll(JSON.stringify(data));
 }
 
 async function sendChatMessage(str) {
@@ -389,7 +398,7 @@ async function sendChatMessage(str) {
     })
     console.log(chatData)
     sendToAll(chatData)
-    postChatMessage(str, nickName)
+    await postChatMessage(str, nickName)
 }
 
 async function postChatMessage(str, nickname) {

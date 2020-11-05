@@ -11,7 +11,8 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
     - Set password to group?
     
 - (Support new p2p topologies)
-    - Find a way to mash video streams together
+    - Find a way to mash video streams together (video)
+    
 # TODO
 - Implement file sharing system
     - Display Shared files (immutable)
@@ -20,7 +21,8 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
  
 - Support new p2p topologies
     - Find a way to establish 'strong' clients from 'weak' clients
-    
+    - Find a way to mash video streams together (audio)
+
 - Display different tabs with content for all users
     - Tabs include images, or simple display files
    
