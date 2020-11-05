@@ -1,38 +1,24 @@
 # fluttershy-face2face
 This is a repository for the P2P course, which aims to implement WebRTC and some P2P architecture to create a collaborative video conference application.
 
-# Done 
-- Need new main page
-    - Join group chat by ID
-        - Optionally with password for room
-- Support multiple different callers at once.
-- Make groups
-    - Share links to groups
-    - Set password to group?
-    
-- (Support new p2p topologies)
-    - Find a way to mash video streams together (video)
-    
-# TODO
+# Priority (main features)
 - Implement file sharing system
     - Display Shared files (immutable)
     - Download link shows up in chatlogs
 - Chat system
- 
+
+- Tracking of network activity for topology / visual representation of network for debugging/presentation (graph)
+
 - Support new p2p topologies
     - Find a way to establish 'strong' clients from 'weak' clients
     - Find a way to mash video streams together (audio)
 
-- Display different tabs with content for all users
-    - Tabs include images, or simple display files
-   
-- Implement https
-    - Needs certificate to function, only possible when server is live
-    - Test system with multiple users
-    
-
 - Use auto-merge library to have collabarative text editing
 
+# Nice-to-have
+- Implement https
+    - Needs certificate to function, only possible when server is live
+    - Test system with multiple users    
 - Database for storing chatlogs
 - Screenshare feature
 - Homework feature 
@@ -45,9 +31,21 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
 
 - Nice to have chat commands
 
-- Tracking of netowrk activity for topology / visuel representation of network for debugging/presentation (graph)
+# Done 
+- Need new main page
+    - Join group chat by ID
+        - Optionally with password for room
+- Support multiple different callers at once.
+- Make groups
+    - Share links to groups
+    - Set password to group?
+    
+- (Support new p2p topologies)
+    - Find a way to mash video streams together (video)
 
-
+- Display different tabs with content for all users
+    - Tabs include images, or simple display files
+      
 # Interesting Links
 - (For text editing) https://blog.datproject.org/2019/03/05/caracara-react-dat-automerge/
 - https://users-cs.au.dk/bouvin/dBIoTP2PC/2020/projects/#panzoom
