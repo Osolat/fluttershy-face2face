@@ -11,7 +11,7 @@ let animationId = null;
 let audioContext = new window.AudioContext();
 let micNodes = [];
 let outputNodes = [];
-let audioMixSterams = [];
+let audioMixStreams = [];
 
 // mixed video stream
 mixStream = canvasMix.captureStream(15);
@@ -73,7 +73,7 @@ function onMemberStreamLeave(id, stream) {
     } else {
         console.warn('micNode missed');
     }
-    delete audioMixSterams[id];
+    delete audioMixStreams[id];
 
     // --- disconnect mic from ohter output ---
     let thisMicNode = micNodes[id];
@@ -103,7 +103,7 @@ function onPrepareLocalStream(id, peer) {
     let newOutputNode = audioContext.createMediaStreamDestination();
     let newAudioMixStream = newOutputNode.stream;
     outputNodes[id] = newOutputNode;
-    audioMixSterams[id] = newAudioMixStream;
+    audioMixStreams[id] = newAudioMixStream;
     for (let key in micNodes) {
         if (key === id) {
             console.log('skip mic(id=' + key + ') because same id=' + id);

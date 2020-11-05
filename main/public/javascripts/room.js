@@ -20,10 +20,11 @@ let mixStream = null;
 let animationId = null;
 
 // for audio
-let audioContext;
+let audioContext = new window.AudioContext();
 let micNodes = [];
 let outputNodes = [];
 let audioMixSterams = [];
+
 
 // for filetransfer
 let receiveBuffer = [];
@@ -31,14 +32,13 @@ let receivedSize = 0;
 let statsInterval = null;
 
 
-canvasMix.addEventListener('click', function () {
-    audioContext = new window.AudioContext();
-    audioContext.resume().then(() => {
-        console.log('Playback resumed successfully');
-    });
-});
-
 //Variables for network etc
+/*const popUpBut = document.querySelector('button#audio-popup-button');
+popUpBut.addEventListener('click', () => {
+    var modal = document.getElementById("audioPopup");
+    audioContext = new window.AudioContext();
+    modal.style.display = "none";
+})*/
 
 const sendFileButton = document.querySelector('button#sendFile');
 sendFileButton.addEventListener('click', () => {
@@ -51,7 +51,7 @@ var RTCConnectionsCallStatus = {};
 var roomConnectionsSet = new Set();
 var activeConnectionSize = 0;
 let RTCConnectionNames = {};
-var isMixingPeer = true;
+var isMixingPeer = false;
 let socket;
 let roomID;
 let nickName = "Anonymous";
@@ -243,6 +243,17 @@ function initNewRTCConnection(socketId) {
         if (remoteVideo) {
             remoteVideo.srcObject = stream;
         }
+        let micNode = audioContext.createMediaStreamSource(stream);
+        micNodes[socketId] = micNode;
+        for (let key in outputNodes) {
+            if (key === socketId) {
+                console.log('skip output(id=' + key + ') because same id=' + id);
+            } else {
+                let otherOutputNode = outputNodes[key];
+                micNode.connect(otherOutputNode);
+            }
+        }
+
     };
     RTCConnections[socketId] = rtcConnection;
     activeConnectionSize++;
@@ -328,7 +339,21 @@ function gotStream(stream) {
     window.localStream = stream;
     if (isMixingPeer) {
         window.localStream = mixStream;
+        let newOutputNode = audioContext.createMediaStreamDestination();
+        let newAudioMixStream = newOutputNode.stream;
+        outputNodes[id] = newOutputNode;
+        audioMixStreams[id] = newAudioMixStream;
+        for (let key in micNodes) {
+            if (key === id) {
+                console.log('skip mic(id=' + key + ') because same id=' + id);
+            } else {
+                console.log('connect mic(id=' + key + ') to this output');
+                let otherMicNode = micNodes[key];
+                otherMicNode.connect(newOutputNode);
+            }
+        }
     }
+    window.localStream.addTrack(stream.getAudioTracks()[0])
 }
 
 function sendToAll(data) {
