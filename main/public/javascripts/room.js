@@ -262,7 +262,6 @@ function initNewRTCConnection(socketId) {
     RTCConnectionsCallStatus[socketId] = false;
     if (isMixingPeer) {
         window.localStream.getTracks().forEach(track => rtcConnection.addTrack(track, mixStream));
-        muteRemoteVideos();
     } else {
         window.localStream.getTracks().forEach(track => rtcConnection.addTrack(track, window.localStream));
     }
@@ -357,11 +356,12 @@ function gotStream(stream) {
         outputNodes[-1] = newOutputNode;
         audioMixStreams[-1] = newAudioMixStream;
         for (let key in micNodes) {
+            console.log("Iterationg micNodes")
             if (key === -1) {
-                console.log('skip mic(id=' + key + ') because same id=' + id);
+                console.log('skip mic(id=' + key + ') because same id=');
             } else {
                 console.log('connect mic(id=' + key + ') to this output');
-                let otherMicNode = micNodes[-1];
+                let otherMicNode = micNodes[key];
                 otherMicNode.connect(newOutputNode);
             }
         }
