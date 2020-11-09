@@ -10,8 +10,9 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
 - Tracking of network activity for topology / visual representation of network for debugging/presentation (graph)
 
 - Support new p2p topologies
+    - Mixer election protocol
+        - 
     - Find a way to establish 'strong' clients from 'weak' clients
-    - Find a way to mash video streams together (audio)
 
 - Use auto-merge library to have collabarative text editing
 
@@ -42,6 +43,8 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
     
 - (Support new p2p topologies)
     - Find a way to mash video streams together (video)
+    - Find a way to mash video streams together (audio)
+
 
 - Display different tabs with content for all users
     - Tabs include images, or simple display files

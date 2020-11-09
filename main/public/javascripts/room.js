@@ -23,6 +23,8 @@ let animationId = null;
 let audioContext = new window.AudioContext();
 let micNodes = [];
 let outputNodes = [];
+let outputNode;
+let audioMixStream;
 let audioMixStreams = [];
 
 
@@ -40,6 +42,8 @@ popUpBut.addEventListener('click', () => {
     modal.style.display = "none";
 })*/
 
+let localVid = document.getElementById('local-video');
+localVid.addEventListener("click", () => sendMixerSignal());
 const sendFileButton = document.querySelector('button#sendFile');
 sendFileButton.addEventListener('click', () => {
     console.log(dataChannels)
@@ -51,7 +55,7 @@ var RTCConnectionsCallStatus = {};
 var roomConnectionsSet = new Set();
 var activeConnectionSize = 0;
 let RTCConnectionNames = {};
-var isMixingPeer = true;
+var isMixingPeer = false;
 let socket;
 let roomID;
 let nickName = "Anonymous";
@@ -236,26 +240,20 @@ function gotRemoteStream(rtcTrackEvent, userId) {
     }
 }
 
+
 function initNewRTCConnection(socketId) {
     let rtcConnection = new RTCPeerConnection();
     rtcConnection.ontrack = function ({streams: [stream]}) {
         const remoteVideo = document.getElementById(socketId);
         if (remoteVideo) {
             remoteVideo.srcObject = stream;
-            if (isMixingPeer) remoteVideo.volume = 0;
         }
-        let micNode = audioContext.createMediaStreamSource(stream);
-        micNodes[socketId] = micNode;
-        for (let key in outputNodes) {
-            console.log("Iterate output nodes")
-            if (key === socketId) {
-                console.log('skip output(id=' + key + ') because same id=' + id);
-            } else {
-                let otherOutputNode = outputNodes[key];
-                micNode.connect(otherOutputNode);
-            }
+        if (isMixingPeer) {
+            let micNode = audioContext.createMediaStreamSource(stream);
+            micNodes[socketId] = micNode;
+            console.log("Connected micnode " + socketId + " to my output node")
+            micNode.connect(outputNode);
         }
-
     };
     RTCConnections[socketId] = rtcConnection;
     activeConnectionSize++;
@@ -349,23 +347,14 @@ function gotStream(stream) {
     const localVideo = document.getElementById("local-video");
     localVideo.srcObject = stream;
     window.localStream = stream;
+    audioContext.resume();
     if (isMixingPeer) {
         window.localStream = mixStream;
-        let newOutputNode = audioContext.createMediaStreamDestination();
-        let newAudioMixStream = newOutputNode.stream;
-        outputNodes[-1] = newOutputNode;
-        audioMixStreams[-1] = newAudioMixStream;
-        for (let key in micNodes) {
-            console.log("Iterationg micNodes")
-            if (key === -1) {
-                console.log('skip mic(id=' + key + ') because same id=');
-            } else {
-                console.log('connect mic(id=' + key + ') to this output');
-                let otherMicNode = micNodes[key];
-                otherMicNode.connect(newOutputNode);
-            }
-        }
-        window.localStream.addTrack(newAudioMixStream.getAudioTracks()[0])
+        outputNode = audioContext.createMediaStreamDestination();
+        audioMixStream = outputNode.stream;
+        let micNode = audioContext.createMediaStreamSource(stream);
+        micNode.connect(outputNode)
+        window.localStream.addTrack(audioMixStream.getAudioTracks()[0])
     } else {
         window.localStream.addTrack(stream.getAudioTracks()[0])
     }
@@ -422,7 +411,44 @@ function onReceiveMessageCallback(event) {
     }
 }
 
-async function sendMixerSignal() {
+let lastResult = {};
+
+function sendMixerSignal() {
+    for (const webCon in RTCConnections) {
+        console.log(webCon)
+        RTCConnections[webCon].getStats().then(res => {
+            res.forEach(report => {
+                let bytes;
+                let headerBytes;
+                let packets;
+                if (report.type === 'outbound-rtp') {
+                    console.log(report);
+
+                    if (report.isRemote) {
+                        return;
+                    }
+                    const now = report.timestamp;
+                    bytes = report.bytesSent;
+                    headerBytes = report.headerBytesSent;
+
+                    packets = report.packetsSent;
+                    if (lastResult[webCon] && lastResult[webCon].has(report.id)) {
+                        const deltaT = now - lastResult[webCon].get(report.id).timestamp;
+                        // calculate bitrate
+                        const bitrate = 8 * (bytes - lastResult[webCon].get(report.id).bytesSent) /
+                            deltaT;
+                        const headerrate = 8 * (headerBytes - lastResult[webCon].get(report.id).headerBytesSent) /
+                            deltaT;
+
+                        console.log(webCon + " bitrate:" + bitrate);
+                        console.log(webCon + " headerrate:" + headerrate);
+
+                    }
+                }
+            });
+            lastResult[webCon] = res;
+        });
+    }
     let data = {
         type: "mixerSignal",
         origin: socket.id
