@@ -43,7 +43,7 @@ popUpBut.addEventListener('click', () => {
 })*/
 
 let localVid = document.getElementById('local-video');
-localVid.addEventListener("click", () => sendMixerSignal());
+localVid.addEventListener("click", () => benchMarkAllKnownPeers());
 const sendFileButton = document.querySelector('button#sendFile');
 sendFileButton.addEventListener('click', () => {
     console.log(dataChannels)
@@ -59,7 +59,12 @@ var isMixingPeer = false;
 let socket;
 let roomID;
 let nickName = "Anonymous";
-
+let benchmarkBuffers = {};
+let benchmarkTimes = {};
+const benchmarkSize = 1024 * 1024 * 4; // 4000kbytes = 4MB
+const benchmarkPackSize = 1024 * 8 // 8 Kbytes
+const benchmarkPacketNums = (benchmarkSize) / (benchmarkPackSize)
+console.log(benchmarkPacketNums)
 // mixed video stream
 if (isMixingPeer) {
     mixStream = canvasMix.captureStream(15);
@@ -360,6 +365,35 @@ function gotStream(stream) {
     }
 }
 
+async function benchMarkAllKnownPeers() {
+    for (const [sock, _] of Object.entries(dataChannels)) {
+        await benchMarkPeer(sock);
+    }
+}
+
+function benchMarkPeer(socketID) {
+    if (dataChannels.hasOwnProperty(socketID)) {
+        var d = new Date(); // for now
+        let start = d.getTime();
+        var array = new Uint8Array(benchmarkPackSize);  // allocates KByte * 10
+        console.log("Start: " + start)
+        array.fill(1)
+        let data = {
+            type: "benchmarkOut",
+            origin: socket.id,
+            ts: start,
+            buff: Array.from(array)
+        }
+        let realdata = JSON.stringify(data);
+        for (let i = 0; i < benchmarkPacketNums; i++) {
+            dataChannels[socketID].send(realdata);
+        }
+    } else {
+        console.log("Tried to benchmark a non-existing datachannel socket: " + socketID)
+    }
+
+}
+
 function sendToAll(data) {
     for (const [_, dc] of Object.entries(dataChannels)) {
         dc.send(data)
@@ -367,7 +401,7 @@ function sendToAll(data) {
 }
 
 function onReceiveMessageCallback(event) {
-    console.log(`Received Message ${event.data}`);
+    // console.log(`Received Message ${event.data}`);
     let data = JSON.parse(event.data)
     switch (data.type) {
         case "chat":
@@ -400,6 +434,36 @@ function onReceiveMessageCallback(event) {
                 }
             }
             break;
+        case "benchmarkOut":
+            if (!benchmarkBuffers.hasOwnProperty(data.origin)) {
+                benchmarkBuffers[data.origin] = [];
+            }
+            console.log(benchmarkBuffers[data.origin].length)
+            console.log(benchmarkSize)
+
+            data.buff.forEach(byte => benchmarkBuffers[data.origin].push(byte));
+            if (benchmarkBuffers[data.origin].length === benchmarkSize) {
+                var d = new Date(); // for now
+                console.log(d.getTime())
+                console.log(data.ts)
+
+                let deltaTS = (d.getTime() - data.ts) / 1000; //Diff in seconds
+                let speed = benchmarkSize / deltaTS;
+                let mBSSpeed = speed / (1024 * 1024);
+                console.log("I AM SPEED mb/s: " + mBSSpeed);
+                benchmarkTimes[data.origin] = mBSSpeed;
+                let response = {
+                    type: "benchMarkResponse",
+                    origin: socket.id,
+                    benchmark: mBSSpeed
+                }
+                dataChannels[data.origin].send(JSON.stringify(response))
+                benchmarkBuffers[data.origin] = [];
+            }
+            break;
+        case "benchMarkResponse":
+            benchmarkTimes[data.origin] = data.benchmark;
+            console.log(benchmarkTimes)
         case "mixerSignal":
             console.log("Got mixer signal from: " + data.origin);
             break;
