@@ -10,7 +10,6 @@ textInput.on("keypress", function (event) {
     }
 });
 
-
 //For mixing
 let canvasMix = document.getElementById('mix-canvas');
 let ctxMix = canvasMix.getContext('2d');
@@ -21,10 +20,13 @@ let mixStream = null;
 let animationId = null;
 
 // for audio
-let audioContext;
+let audioContext = new window.AudioContext();
 let micNodes = [];
 let outputNodes = [];
-let audioMixSterams = [];
+let outputNode;
+let audioMixStream;
+let audioMixStreams = [];
+
 
 // for filetransfer
 let peersReady = {};
@@ -34,16 +36,16 @@ let statsInterval = null;
 let timestampStart = -1;
 
 
-canvasMix.addEventListener('click', function () {
-    audioContext = new window.AudioContext();
-    audioContext.resume().then(() => {
-        console.log('Playback resumed successfully');
-    });
-});
-
-
 //Variables for network etc
+/*const popUpBut = document.querySelector('button#audio-popup-button');
+popUpBut.addEventListener('click', () => {
+    var modal = document.getElementById("audioPopup");
+    audioContext = new window.AudioContext();
+    modal.style.display = "none";
+})*/
 
+let localVid = document.getElementById('local-video');
+localVid.addEventListener("click", () => benchMarkAllKnownPeers());
 const sendFileButton = document.querySelector('button#sendFile');
 sendFileButton.addEventListener('click', () => {
     if(!filetransfer.fileEmpty()) {
@@ -62,6 +64,12 @@ var isMixingPeer = false;
 let socket;
 let roomID;
 let nickName = "Anonymous";
+let benchmarkBuffers = {};
+let benchmarkTimes = {};
+const benchmarkSize = 1024 * 1024 * 4; // 4000kbytes = 4MB
+const benchmarkPackSize = 1024 * 8 // 8 Kbytes
+const benchmarkPacketNums = (benchmarkSize) / (benchmarkPackSize)
+console.log(benchmarkPacketNums)
 
 function hashCode(string) {
     var hash = 0, i, chr;
@@ -273,12 +281,19 @@ function gotRemoteStream(rtcTrackEvent, userId) {
     }
 }
 
+
 function initNewRTCConnection(socketId) {
     let rtcConnection = new RTCPeerConnection();
     rtcConnection.ontrack = function ({streams: [stream]}) {
         const remoteVideo = document.getElementById(socketId);
         if (remoteVideo) {
             remoteVideo.srcObject = stream;
+        }
+        if (isMixingPeer) {
+            let micNode = audioContext.createMediaStreamSource(stream);
+            micNodes[socketId] = micNode;
+            console.log("Connected micnode " + socketId + " to my output node")
+            micNode.connect(outputNode);
         }
     };
     RTCConnections[socketId] = rtcConnection;
@@ -293,6 +308,16 @@ function initNewRTCConnection(socketId) {
     ctxMix.rect(0, 0, widestVid, tallestVid);
     ctxMix.fillStyle = "black";
     ctxMix.fill();
+}
+
+function muteRemoteVideos() {
+    roomConnectionsSet.forEach((s) => {
+        const exists = document.getElementById(s);
+        if (exists) {
+            exists.volume = 0;
+            console.log("Muted remote video: " + s)
+        }
+    })
 }
 
 function updateUserList(socketIds) {
@@ -363,9 +388,46 @@ function gotStream(stream) {
     const localVideo = document.getElementById("local-video");
     localVideo.srcObject = stream;
     window.localStream = stream;
+    audioContext.resume();
     if (isMixingPeer) {
         window.localStream = mixStream;
+        outputNode = audioContext.createMediaStreamDestination();
+        audioMixStream = outputNode.stream;
+        let micNode = audioContext.createMediaStreamSource(stream);
+        micNode.connect(outputNode)
+        window.localStream.addTrack(audioMixStream.getAudioTracks()[0])
+    } else {
+        window.localStream.addTrack(stream.getAudioTracks()[0])
     }
+}
+
+async function benchMarkAllKnownPeers() {
+    for (const [sock, _] of Object.entries(dataChannels)) {
+        await benchMarkPeer(sock);
+    }
+}
+
+function benchMarkPeer(socketID) {
+    if (dataChannels.hasOwnProperty(socketID)) {
+        var d = new Date(); // for now
+        let start = d.getTime();
+        var array = new Uint8Array(benchmarkPackSize);  // allocates KByte * 10
+        console.log("Start: " + start)
+        array.fill(1)
+        let data = {
+            type: "benchmarkOut",
+            origin: socket.id,
+            ts: start,
+            buff: Array.from(array)
+        }
+        let realdata = JSON.stringify(data);
+        for (let i = 0; i < benchmarkPacketNums; i++) {
+            dataChannels[socketID].send(realdata);
+        }
+    } else {
+        console.log("Tried to benchmark a non-existing datachannel socket: " + socketID)
+    }
+
 }
 
 function sendToAll(data) {
@@ -417,6 +479,39 @@ function onReceiveMessageCallback(event) {
                 }
             }
             break;
+        case "benchmarkOut":
+            if (!benchmarkBuffers.hasOwnProperty(data.origin)) {
+                benchmarkBuffers[data.origin] = [];
+            }
+            console.log(benchmarkBuffers[data.origin].length)
+            console.log(benchmarkSize)
+
+            data.buff.forEach(byte => benchmarkBuffers[data.origin].push(byte));
+            if (benchmarkBuffers[data.origin].length === benchmarkSize) {
+                var d = new Date(); // for now
+                console.log(d.getTime())
+                console.log(data.ts)
+
+                let deltaTS = (d.getTime() - data.ts) / 1000; //Diff in seconds
+                let speed = benchmarkSize / deltaTS;
+                let mBSSpeed = speed / (1024 * 1024);
+                console.log("I AM SPEED mb/s: " + mBSSpeed);
+                benchmarkTimes[data.origin] = mBSSpeed;
+                let response = {
+                    type: "benchMarkResponse",
+                    origin: socket.id,
+                    benchmark: mBSSpeed
+                }
+                dataChannels[data.origin].send(JSON.stringify(response))
+                benchmarkBuffers[data.origin] = [];
+            }
+            break;
+        case "benchMarkResponse":
+            benchmarkTimes[data.origin] = data.benchmark;
+            console.log(benchmarkTimes)
+        case "mixerSignal":
+            console.log("Got mixer signal from: " + data.origin);
+            break;
         case "SomeSignalType":
             console.log("Here something should happen if i receive some message with type=SomeSignal")
             break;
@@ -442,8 +537,53 @@ function onReceiveMessageCallback(event) {
             }
             break;
         default:
-            console.log("error: unknown message data type ")
+            console.log("error: unknown message data type or malformed JSON format")
     }
+}
+
+let lastResult = {};
+
+function sendMixerSignal() {
+    for (const webCon in RTCConnections) {
+        console.log(webCon)
+        RTCConnections[webCon].getStats().then(res => {
+            res.forEach(report => {
+                let bytes;
+                let headerBytes;
+                let packets;
+                if (report.type === 'outbound-rtp') {
+                    console.log(report);
+
+                    if (report.isRemote) {
+                        return;
+                    }
+                    const now = report.timestamp;
+                    bytes = report.bytesSent;
+                    headerBytes = report.headerBytesSent;
+
+                    packets = report.packetsSent;
+                    if (lastResult[webCon] && lastResult[webCon].has(report.id)) {
+                        const deltaT = now - lastResult[webCon].get(report.id).timestamp;
+                        // calculate bitrate
+                        const bitrate = 8 * (bytes - lastResult[webCon].get(report.id).bytesSent) /
+                            deltaT;
+                        const headerrate = 8 * (headerBytes - lastResult[webCon].get(report.id).headerBytesSent) /
+                            deltaT;
+
+                        console.log(webCon + " bitrate:" + bitrate);
+                        console.log(webCon + " headerrate:" + headerrate);
+
+                    }
+                }
+            });
+            lastResult[webCon] = res;
+        });
+    }
+    let data = {
+        type: "mixerSignal",
+        origin: socket.id
+    }
+    sendToAll(JSON.stringify(data));
 }
 function decode(str) {
     var buf = new ArrayBuffer(str.length); // 2 bytes for each char
@@ -462,9 +602,8 @@ async function sendChatMessage(str) {
         message: str
     })
     console.log(chatData)
-    sendToAll
-    (chatData)
-    postChatMessage(str, nickName)
+    sendToAll(chatData)
+    await postChatMessage(str, nickName)
 }
 
 async function postChatMessage(str, nickname) {
