@@ -10,6 +10,7 @@ textInput.on("keypress", function (event) {
     }
 });
 
+
 //For mixing
 let canvasMix = document.getElementById('mix-canvas');
 let ctxMix = canvasMix.getContext('2d');
@@ -26,9 +27,11 @@ let outputNodes = [];
 let audioMixSterams = [];
 
 // for filetransfer
-let receiveBuffer = [];
-let receivedSize = 0;
+let peersReady = {};
+let receiveBuffers = {};
+let filemetadata = {};
 let statsInterval = null;
+let timestampStart = -1;
 
 
 canvasMix.addEventListener('click', function () {
@@ -38,15 +41,17 @@ canvasMix.addEventListener('click', function () {
     });
 });
 
+
 //Variables for network etc
 
 const sendFileButton = document.querySelector('button#sendFile');
 sendFileButton.addEventListener('click', () => {
-    console.log(dataChannels)
+    if(!filetransfer.fileEmpty()) {
+        sendMetaData()
+    }
 })
 
 const peerConnection = new RTCPeerConnection();
-;
 const dataChannels = {};
 var RTCConnections = {};
 var RTCConnectionsCallStatus = {};
@@ -57,6 +62,36 @@ var isMixingPeer = false;
 let socket;
 let roomID;
 let nickName = "Anonymous";
+
+function hashCode(string) {
+    var hash = 0, i, chr;
+    for (i = 0; i < string.length; i++) {
+        chr   = string.charCodeAt(i);
+        hash  = ((hash << 5) - hash) + chr;
+        hash |= 0; // Convert to 32bit integer
+    }
+    return hash;
+}
+
+function sendMetaData(){
+    let file = fileInput.files[0];
+    console.log(file);
+    file.text().then(
+        (v) => {
+            let hash = hashCode(v)
+            peersReady[hash] = 0;
+            console.log(hash)
+            let JSONdata = JSON.stringify({
+                type: "file-metadata",
+                name: file.name,
+                size: file.size,
+                filetype: file.type,
+                hash: hash
+            })
+            sendToAll(JSONdata)
+        }
+    )
+}
 
 // mixed video stream
 if (isMixingPeer) {
@@ -339,34 +374,43 @@ function sendToAll(data) {
     }
 }
 
+
 function onReceiveMessageCallback(event) {
     console.log(`Received Message ${event.data}`);
     let data = JSON.parse(event.data)
+    let replyChannel = event.target;
     switch (data.type) {
         case "chat":
             postChatMessage(data.message, data.nickname)
             break;
         case "file":
-            receiveBuffer.push(event.data);
-            receivedSize += event.data.byteLength;
-            receiveProgress.value = receivedSize;
+            if (timestampStart == -1) {
+                let timestampStart = (new Date()).getTime()
+            }
+            let payload = data.payload;
+            console.log("payload")
+            console.log(payload)
+            let buffer = decode(payload)
+            console.log("buffer")
+            console.log(buffer)
+            receiveBuffers[data.hash].push(buffer);
+            console.log("old size: "+filemetadata[data.hash].receivedSize)
+            filemetadata[data.hash].receivedSize += buffer.byteLength
+            console.log("new size: "+filemetadata[data.hash].receivedSize)
             // we are assuming that our signaling protocol told
             // about the expected file size (and name, hash, etc).
-            const file = fileInput.files[0];
-            if (receivedSize === file.size) {
-                const received = new Blob(receiveBuffer);
-                receiveBuffer = [];
-                downloadAnchor.href = URL.createObjectURL(received);
-                downloadAnchor.download = file.name;
-                downloadAnchor.textContent =
-                    `Click to download '${file.name}' (${file.size} bytes)`;
-                downloadAnchor.style.display = 'block';
-
-                const bitrate = Math.round(receivedSize * 8 /
-                    ((new Date()).getTime() - timestampStart));
-                bitrateDiv.innerHTML =
-                    `<strong>Average Bitrate:</strong> ${bitrate} kbits/sec (max: ${bitrateMax} kbits/sec)`;
-
+            if (filemetadata[data.hash].receivedSize === filemetadata[data.hash].size) {
+                console.log("Received file")
+                const received = new Blob(receiveBuffers[data.hash]);
+                console.log(received)
+                const name = filemetadata[data.hash].name
+                receiveBuffers[data.hash] = [];
+                filetransfer.makeDownloadLink(received, filemetadata[data.hash]);
+                //const bitrate = Math.round(filemetadata[data.hash].receivedSize * 8 /
+                //    ((new Date()).getTime() - timestampStart));
+                //bitrateDiv.innerHTML =
+                //    `<strong>Average Bitrate:</strong> ${bitrate} kbits/sec (max: ${bitrateMax} kbits/sec)`;
+                timestampStart = -1
                 if (statsInterval) {
                     clearInterval(statsInterval);
                     statsInterval = null;
@@ -376,10 +420,40 @@ function onReceiveMessageCallback(event) {
         case "SomeSignalType":
             console.log("Here something should happen if i receive some message with type=SomeSignal")
             break;
+        case "file-metadata":
+            receiveBuffers[data.hash] = [];
+            filemetadata[data.hash] = data
+            let reply = JSON.stringify({
+                type: "file-callback",
+                hash: data.hash
+            });
+            filemetadata[data.hash].receivedSize = 0;
+            console.log(filemetadata[data.hash])
+            replyChannel.send(reply);
+            break;
+        case "file-callback":
+            peersReady[data.hash]++
+            let len = Object.keys(dataChannels).length
+            if (peersReady[data.hash] == len) {
+                filetransfer.sendData(dataChannels, data.hash, nickName)
+            } else {
+                console.log("peersReady: "+peersReady[data.hash])
+                console.log("datachannel length: "+len)
+            }
+            break;
         default:
             console.log("error: unknown message data type ")
     }
 }
+function decode(str) {
+    var buf = new ArrayBuffer(str.length); // 2 bytes for each char
+    var bufView = new Uint8Array(buf);
+    for (var i=0, strLen=str.length; i < strLen; i++) {
+        bufView[i] = str.charCodeAt(i);
+    }
+    return buf;
+}
+
 
 async function sendChatMessage(str) {
     let chatData = JSON.stringify({
@@ -388,7 +462,8 @@ async function sendChatMessage(str) {
         message: str
     })
     console.log(chatData)
-    sendToAll(chatData)
+    sendToAll
+    (chatData)
     postChatMessage(str, nickName)
 }
 
@@ -410,6 +485,8 @@ async function postChatMessage(str, nickname) {
         chatloglist.appendChild(chatEntryItem);
     }
 }
+
+
 
 function openPage(pageName, elmnt, color) {
     var i, tabcontent, tablinks;
