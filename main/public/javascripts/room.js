@@ -382,16 +382,44 @@ function becomeMixer() {
     micNode.connect(outputNode)
     window.localStream.addTrack(audioMixStream.getAudioTracks()[0])
     let tracks = window.localStream.getTracks();
+    /*for (const [sock, _] of Object.entries(RTCConnections)) {
+        let micNode = audioContext.createMediaStreamSource(RTCConnections[sock].getTracks()[0]);
+        micNodes[socketId] = micNode;
+        console.log("Connected micnode " + socketId + " to my output node")
+        micNode.connect(outputNode);
+    }*/
     for (const [sock, _] of Object.entries(RTCConnections)) {
+        const remoteVideo = document.getElementById(sock);
+        if (remoteVideo) {
+            let micNode = audioContext.createMediaStreamSource(remoteVideo.srcObject);
+            micNodes[sock] = micNode;
+            console.log("Connected micnode " + sock + " to my output node")
+            micNode.connect(outputNode);
+        } else {
+            console.log("Something went wrong in getting audio for mixingPeerSwap")
+        }
+    }
+    for (const [sock, _] of Object.entries(RTCConnections)) {
+        /* let receivers = RTCConnections[sock].getReceivers();
+         console.log(receivers);
+         for (let i = 0; i < receivers.length; i++) {
+
+             console.log("Receivers: " + receivers[i].track.kind);
+             if (receivers[i].track.kind === "audio") {
+                 let micNode = audioContext.createMediaStreamSource(receivers[i].track.streams[0]);
+                 micNodes[sock] = micNode;
+                 console.log("Connected micnode " + sock + " to my output node")
+                 micNode.connect(outputNode);
+             }
+         }*/
+        console.log(RTCConnections[sock].getSenders());
         for (let i = 0; i < tracks.length; i++) {
             console.log(tracks[i].kind);
             var sender = RTCConnections[sock].getSenders().find(function (s) {
                 return s.track.kind === tracks[i].kind;
             });
-            console.log('found sender:', sender);
             sender.replaceTrack(tracks[i]).then(r => "Replaced track");
         }
-        RTCConnections[sock].ontrack = getOntrackFunction(sock);
     }
 }
 
