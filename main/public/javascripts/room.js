@@ -37,7 +37,7 @@ let statsInterval = null;
 //Variables for network etc
 
 let localVid = document.getElementById('local-video');
-localVid.addEventListener("click", () => benchMarkAllKnownPeers());
+localVid.addEventListener("click", () => becomeMixer());
 const sendFileButton = document.querySelector('button#sendFile');
 sendFileButton.addEventListener('click', () => {
     console.log(dataChannels)
@@ -241,9 +241,8 @@ function gotRemoteStream(rtcTrackEvent, userId) {
 }
 
 
-function initNewRTCConnection(socketId) {
-    let rtcConnection = new RTCPeerConnection();
-    rtcConnection.ontrack = function ({streams: [stream]}) {
+function getOntrackFunction(socketId) {
+    return function ({streams: [stream]}) {
         const remoteVideo = document.getElementById(socketId);
         if (remoteVideo) {
             remoteVideo.srcObject = stream;
@@ -255,6 +254,11 @@ function initNewRTCConnection(socketId) {
             micNode.connect(outputNode);
         }
     };
+}
+
+function initNewRTCConnection(socketId) {
+    let rtcConnection = new RTCPeerConnection();
+    rtcConnection.ontrack = getOntrackFunction(socketId);
     RTCConnections[socketId] = rtcConnection;
     activeConnectionSize++;
     RTCConnectionsCallStatus[socketId] = false;
@@ -363,6 +367,31 @@ function gotStream(stream) {
 async function benchMarkAllKnownPeers() {
     for (const [sock, _] of Object.entries(dataChannels)) {
         await benchMarkPeer(sock);
+    }
+}
+
+function becomeMixer() {
+    mixStream = canvasMix.captureStream(15);
+    animationId = window.requestAnimationFrame(drawCanvas)
+    isMixingPeer = true;
+    const localVideo = document.getElementById("local-video");
+    window.localStream = mixStream;
+    outputNode = audioContext.createMediaStreamDestination();
+    audioMixStream = outputNode.stream;
+    let micNode = audioContext.createMediaStreamSource(localVideo.srcObject);
+    micNode.connect(outputNode)
+    window.localStream.addTrack(audioMixStream.getAudioTracks()[0])
+    let tracks = window.localStream.getTracks();
+    for (const [sock, _] of Object.entries(RTCConnections)) {
+        for (let i = 0; i < tracks.length; i++) {
+            console.log(tracks[i].kind);
+            var sender = RTCConnections[sock].getSenders().find(function (s) {
+                return s.track.kind === tracks[i].kind;
+            });
+            console.log('found sender:', sender);
+            sender.replaceTrack(tracks[i]).then(r => "Replaced track");
+        }
+        RTCConnections[sock].ontrack = getOntrackFunction(sock);
     }
 }
 
