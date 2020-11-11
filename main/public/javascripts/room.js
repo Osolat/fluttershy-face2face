@@ -35,12 +35,6 @@ let statsInterval = null;
 
 
 //Variables for network etc
-/*const popUpBut = document.querySelector('button#audio-popup-button');
-popUpBut.addEventListener('click', () => {
-    var modal = document.getElementById("audioPopup");
-    audioContext = new window.AudioContext();
-    modal.style.display = "none";
-})*/
 
 let localVid = document.getElementById('local-video');
 localVid.addEventListener("click", () => benchMarkAllKnownPeers());
@@ -59,8 +53,10 @@ var isMixingPeer = false;
 let socket;
 let roomID;
 let nickName = "Anonymous";
+let bitRates = {};
+let frameEncodeTimes = {};
 let benchmarkBuffers = {};
-let benchmarkTimes = {};
+let benchmarkManualTimes = {};
 const benchmarkSize = 1024 * 1024 * 4; // 4000kbytes = 4MB
 const benchmarkPackSize = 1024 * 8 // 8 Kbytes
 const benchmarkPacketNums = (benchmarkSize) / (benchmarkPackSize)
@@ -120,7 +116,6 @@ function drawVideoStripe(videoElement, index, memberSocket) {
     } else {
         ctxMix.fillText(RTCConnectionNames[memberSocket], destLeft + 2, destTop + 10);
     }
-
 }
 
 function authenticateUser() {
@@ -371,8 +366,65 @@ async function benchMarkAllKnownPeers() {
     }
 }
 
+function bitRateEveryone() {
+    for (const [sock, _] of Object.entries(RTCConnections)) {
+        bitRateBenchMark(sock);
+    }
+    console.log(bitRates)
+    console.log(frameEncodeTimes)
+}
+
+setInterval(bitRateEveryone, 1000 * 30);
+
+function bitRateBenchMark(socketID) {
+    if (!bitRates[socketID]) {
+        bitRates[socketID] = [];
+        frameEncodeTimes[socketID] = [];
+    }
+
+    RTCConnections[socketID].getStats().then(res => {
+        res.forEach(report => {
+            let bytes;
+            let headerBytes;
+            let packets;
+            if (report.type === 'outbound-rtp') {
+                var str = report.id;
+                var str_pos = str.indexOf("Video");
+                if (!(str_pos > -1)) {
+                    console.log("In benchmarking, ignoring bitrate report of channel not designated as video")
+                    return
+                }
+                console.log(report)
+                if (report.isRemote) {
+                    return;
+                }
+                const now = report.timestamp;
+                bytes = report.bytesSent;
+                headerBytes = report.headerBytesSent;
+                packets = report.packetsSent;
+
+                if (lastResult[socketID] && lastResult[socketID].has(report.id)) {
+                    const deltaFrames = report.framesEncoded - lastResult[socketID].get(report.id).framesEncoded;
+                    const deltaTimeF = report.totalEncodeTime - lastResult[socketID].get(report.id).totalEncodeTime;
+                    const avgFrameEncodeTimeSinceLast = deltaTimeF / deltaFrames;
+                    const deltaT = now - lastResult[socketID].get(report.id).timestamp;
+                    // calculate bitrate
+                    const bitrate = 8 * (bytes - lastResult[socketID].get(report.id).bytesSent) /
+                        deltaT;
+                    const headerrate = 8 * (headerBytes - lastResult[socketID].get(report.id).headerBytesSent) /
+                        deltaT;
+                    bitRates[socketID].push(bitrate);
+                    frameEncodeTimes[socketID].push(avgFrameEncodeTimeSinceLast);
+                }
+            }
+        });
+        lastResult[socketID] = res;
+    });
+}
+
 function benchMarkPeer(socketID) {
     if (dataChannels.hasOwnProperty(socketID)) {
+        //This part benchmarks by sending out 4mb arrays to each peer (array in segment of 8kb)
         var d = new Date(); // for now
         let start = d.getTime();
         var array = new Uint8Array(benchmarkPackSize);  // allocates KByte * 10
@@ -451,7 +503,7 @@ function onReceiveMessageCallback(event) {
                 let speed = benchmarkSize / deltaTS;
                 let mBSSpeed = speed / (1024 * 1024);
                 console.log("I AM SPEED mb/s: " + mBSSpeed);
-                benchmarkTimes[data.origin] = mBSSpeed;
+                benchmarkManualTimes[data.origin] = mBSSpeed;
                 let response = {
                     type: "benchMarkResponse",
                     origin: socket.id,
@@ -462,8 +514,8 @@ function onReceiveMessageCallback(event) {
             }
             break;
         case "benchMarkResponse":
-            benchmarkTimes[data.origin] = data.benchmark;
-            console.log(benchmarkTimes)
+            benchmarkManualTimes[data.origin] = data.benchmark;
+            console.log(benchmarkManualTimes)
         case "mixerSignal":
             console.log("Got mixer signal from: " + data.origin);
             break;
@@ -478,41 +530,6 @@ function onReceiveMessageCallback(event) {
 let lastResult = {};
 
 function sendMixerSignal() {
-    for (const webCon in RTCConnections) {
-        console.log(webCon)
-        RTCConnections[webCon].getStats().then(res => {
-            res.forEach(report => {
-                let bytes;
-                let headerBytes;
-                let packets;
-                if (report.type === 'outbound-rtp') {
-                    console.log(report);
-
-                    if (report.isRemote) {
-                        return;
-                    }
-                    const now = report.timestamp;
-                    bytes = report.bytesSent;
-                    headerBytes = report.headerBytesSent;
-
-                    packets = report.packetsSent;
-                    if (lastResult[webCon] && lastResult[webCon].has(report.id)) {
-                        const deltaT = now - lastResult[webCon].get(report.id).timestamp;
-                        // calculate bitrate
-                        const bitrate = 8 * (bytes - lastResult[webCon].get(report.id).bytesSent) /
-                            deltaT;
-                        const headerrate = 8 * (headerBytes - lastResult[webCon].get(report.id).headerBytesSent) /
-                            deltaT;
-
-                        console.log(webCon + " bitrate:" + bitrate);
-                        console.log(webCon + " headerrate:" + headerrate);
-
-                    }
-                }
-            });
-            lastResult[webCon] = res;
-        });
-    }
     let data = {
         type: "mixerSignal",
         origin: socket.id

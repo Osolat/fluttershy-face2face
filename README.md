@@ -10,9 +10,13 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
 - Tracking of network activity for topology / visual representation of network for debugging/presentation (graph)
 
 - Support new p2p topologies
-    - Mixer election protocol
-        - 
+    - Change mixer on runtime, instead of hardcoding on launch
     - Find a way to establish 'strong' clients from 'weak' clients
+        - (done) Test and get speed of sending a predeterminate amount of bytes (mb/s estimate)
+        - (done) Get bitrate of video channel between peers
+        - (done) Get encoding time per video channel
+        - Use above to pick a strong client
+    - Mixer election protocol
 
 - Use auto-merge library to have collabarative text editing
 
@@ -50,6 +54,7 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
     - Tabs include images, or simple display files
       
 # Interesting Links
+- (webRTC stats) https://www.w3.org/TR/webrtc-stats/#dom-rtcoutboundrtpstreamstats-totalpacketsenddelay
 - (For text editing) https://blog.datproject.org/2019/03/05/caracara-react-dat-automerge/
 - https://users-cs.au.dk/bouvin/dBIoTP2PC/2020/projects/#panzoom
 - https://letsencrypt.org/
