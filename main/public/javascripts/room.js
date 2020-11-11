@@ -37,7 +37,7 @@ let statsInterval = null;
 //Variables for network etc
 
 let localVid = document.getElementById('local-video');
-localVid.addEventListener("click", () => becomeMixer());
+localVid.addEventListener("click", () => pauseNonMixerStreams());
 const sendFileButton = document.querySelector('button#sendFile');
 sendFileButton.addEventListener('click', () => {
     console.log(dataChannels)
@@ -50,6 +50,7 @@ var roomConnectionsSet = new Set();
 var activeConnectionSize = 0;
 let RTCConnectionNames = {};
 var isMixingPeer = false;
+let mixingPeers = [];
 let socket;
 let roomID;
 let nickName = "Anonymous";
@@ -346,6 +347,34 @@ async function callUser(socketId) {
     });
 }
 
+let stoppedStream = false;
+
+function pauseNonMixerStreams() {
+    // This method is meant to stop encoding videos, when we no longer want the mesh network
+    // So we only encode video to the mixing peer
+    if (!stoppedStream) {
+        for (const [sock, _] of Object.entries(RTCConnections)) {
+            if (!mixingPeers.includes(sock)) {
+                let senders = RTCConnections[sock].getSenders();
+                for (let i = 0; i < senders.length; i++) {
+                    senders[i].replaceTrack(null).then(r => console.log("Stopped a track"))
+                }
+            }
+        }
+        stoppedStream = true;
+    } else {
+        let tracks = window.localStream.getTracks();
+        for (const [sock, _] of Object.entries(RTCConnections)) {
+            if (!mixingPeers.includes(sock)) {
+                let senders = RTCConnections[sock].getSenders();
+                for (let i = 0; i < senders.length; i++) {
+                    senders[i].replaceTrack(tracks[i]).then(r => console.log("Restarted a track"))
+                }
+            }
+        }
+    }
+}
+
 function gotStream(stream) {
     console.log('Received local stream');
     const localVideo = document.getElementById("local-video");
@@ -382,12 +411,6 @@ function becomeMixer() {
     micNode.connect(outputNode)
     window.localStream.addTrack(audioMixStream.getAudioTracks()[0])
     let tracks = window.localStream.getTracks();
-    /*for (const [sock, _] of Object.entries(RTCConnections)) {
-        let micNode = audioContext.createMediaStreamSource(RTCConnections[sock].getTracks()[0]);
-        micNodes[socketId] = micNode;
-        console.log("Connected micnode " + socketId + " to my output node")
-        micNode.connect(outputNode);
-    }*/
     for (const [sock, _] of Object.entries(RTCConnections)) {
         const remoteVideo = document.getElementById(sock);
         if (remoteVideo) {
@@ -400,18 +423,6 @@ function becomeMixer() {
         }
     }
     for (const [sock, _] of Object.entries(RTCConnections)) {
-        /* let receivers = RTCConnections[sock].getReceivers();
-         console.log(receivers);
-         for (let i = 0; i < receivers.length; i++) {
-
-             console.log("Receivers: " + receivers[i].track.kind);
-             if (receivers[i].track.kind === "audio") {
-                 let micNode = audioContext.createMediaStreamSource(receivers[i].track.streams[0]);
-                 micNodes[sock] = micNode;
-                 console.log("Connected micnode " + sock + " to my output node")
-                 micNode.connect(outputNode);
-             }
-         }*/
         console.log(RTCConnections[sock].getSenders());
         for (let i = 0; i < tracks.length; i++) {
             console.log(tracks[i].kind);

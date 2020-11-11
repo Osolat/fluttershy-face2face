@@ -9,8 +9,7 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
 
 - Tracking of network activity for topology / visual representation of network for debugging/presentation (graph)
 
-- Support new p2p topologies
-    - Change mixer on runtime, instead of hardcoding on launch
+- Support new p2p topologies 
     - Find a way to establish 'strong' clients from 'weak' clients
         - (done) Test and get speed of sending a predeterminate amount of bytes (mb/s estimate)
         - (done) Get bitrate of video channel between peers
@@ -48,6 +47,11 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
 - (Support new p2p topologies)
     - Find a way to mash video streams together (video)
     - Find a way to mash video streams together (audio)
+    - Change mixer on runtime, instead of hardcoding on launch
+    - (Find a way to establish 'strong' clients from 'weak' clients)
+            - (done) Test and get speed of sending a predeterminate amount of bytes (mb/s estimate)
+            - (done) Get bitrate of video channel between peers
+            - (done) Get encoding time per video channel
 
 
 - Display different tabs with content for all users
