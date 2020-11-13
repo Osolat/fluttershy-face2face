@@ -37,7 +37,7 @@ let statsInterval = null;
 //Variables for network etc
 
 let localVid = document.getElementById('local-video');
-localVid.addEventListener("click", () => pauseNonMixerStreams());
+localVid.addEventListener("click", () => toggleEncoding(Array.from(roomConnectionsSet))[0]);
 const sendFileButton = document.querySelector('button#sendFile');
 sendFileButton.addEventListener('click', () => {
     console.log(dataChannels)
@@ -348,6 +348,31 @@ async function callUser(socketId) {
 }
 
 let stoppedStream = false;
+let stoppedStreams = {}
+
+function toggleEncoding(id) {
+    // This method is meant to stop encoding videos, when we no longer want the mesh network
+    // So we only encode video to the mixing peer
+    if (!stoppedStreams.hasOwnProperty(id)) {
+        stoppedStreams[id] = false;
+    }
+    if (!stoppedStreams[id]) {
+        let senders = RTCConnections[id].getSenders();
+        for (let i = 0; i < senders.length; i++) {
+            senders[i].replaceTrack(null).then(r => console.log("Stopped a track"))
+        }
+        stoppedStreams[id] = true;
+
+    } else {
+        let tracks = window.localStream.getTracks();
+        let senders = RTCConnections[id].getSenders();
+        for (let i = 0; i < senders.length; i++) {
+            senders[i].replaceTrack(tracks[i]).then(r => console.log("Restarted a track"))
+        }
+        stoppedStreams[id] = false;
+
+    }
+}
 
 function pauseNonMixerStreams() {
     // This method is meant to stop encoding videos, when we no longer want the mesh network
