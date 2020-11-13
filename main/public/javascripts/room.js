@@ -37,7 +37,15 @@ let statsInterval = null;
 //Variables for network etc
 
 let localVid = document.getElementById('local-video');
-localVid.addEventListener("click", () => toggleEncoding(Array.from(roomConnectionsSet))[0]);
+localVid.addEventListener("click", () => {
+    if (nonMixerStreamsPaused) {
+        resumeNonMixerStreams();
+        nonMixerStreamsPaused = false;
+    } else {
+        pauseNonMixerStreams();
+        nonMixerStreamsPaused = true;
+    }
+});
 const sendFileButton = document.querySelector('button#sendFile');
 sendFileButton.addEventListener('click', () => {
     console.log(dataChannels)
@@ -50,6 +58,7 @@ var roomConnectionsSet = new Set();
 var activeConnectionSize = 0;
 let RTCConnectionNames = {};
 var isMixingPeer = false;
+let nonMixerStreamsPaused = false;
 let mixingPeers = [];
 let socket;
 let roomID;
@@ -61,7 +70,6 @@ let benchmarkManualTimes = {};
 const benchmarkSize = 1024 * 1024 * 4; // 4000kbytes = 4MB
 const benchmarkPackSize = 1024 * 8 // 8 Kbytes
 const benchmarkPacketNums = (benchmarkSize) / (benchmarkPackSize)
-console.log(benchmarkPacketNums)
 // mixed video stream
 if (isMixingPeer) {
     mixStream = canvasMix.captureStream(15);
@@ -351,8 +359,6 @@ let stoppedStream = false;
 let stoppedStreams = {}
 
 function toggleEncoding(id) {
-    // This method is meant to stop encoding videos, when we no longer want the mesh network
-    // So we only encode video to the mixing peer
     if (!stoppedStreams.hasOwnProperty(id)) {
         stoppedStreams[id] = false;
     }
@@ -370,11 +376,34 @@ function toggleEncoding(id) {
             senders[i].replaceTrack(tracks[i]).then(r => console.log("Restarted a track"))
         }
         stoppedStreams[id] = false;
-
     }
 }
 
 function pauseNonMixerStreams() {
+    for (const [sock, _] of Object.entries(RTCConnections)) {
+        if (!mixingPeers.includes(sock)) {
+            let senders = RTCConnections[sock].getSenders();
+            for (let i = 0; i < senders.length; i++) {
+                senders[i].replaceTrack(null).then(r => console.log("Stopped a track"))
+            }
+        }
+    }
+}
+
+function resumeNonMixerStreams() {
+    let tracks = window.localStream.getTracks();
+    for (const [sock, _] of Object.entries(RTCConnections)) {
+        if (!mixingPeers.includes(sock)) {
+            let senders = RTCConnections[sock].getSenders();
+            for (let i = 0; i < senders.length; i++) {
+                senders[i].replaceTrack(tracks[i]).then(r => console.log("Restarted a track"))
+            }
+        }
+    }
+}
+
+function toggleNonMixerStreams() {
+    // OLD + USELESS
     // This method is meant to stop encoding videos, when we no longer want the mesh network
     // So we only encode video to the mixing peer
     if (!stoppedStream) {
@@ -484,10 +513,9 @@ function bitRateBenchMark(socketID) {
                 var str = report.id;
                 var str_pos = str.indexOf("Video");
                 if (!(str_pos > -1)) {
-                    console.log("In benchmarking, ignoring bitrate report of channel not designated as video")
+                    // Ignores reports from 'audio' channels for instance. Video channels are the significant factor in bitrate
                     return
                 }
-                console.log(report)
                 if (report.isRemote) {
                     return;
                 }
@@ -521,7 +549,6 @@ function benchMarkPeer(socketID) {
         var d = new Date(); // for now
         let start = d.getTime();
         var array = new Uint8Array(benchmarkPackSize);  // allocates KByte * 10
-        console.log("Start: " + start)
         array.fill(1)
         let data = {
             type: "benchmarkOut",
@@ -609,6 +636,7 @@ function onReceiveMessageCallback(event) {
         case "benchMarkResponse":
             benchmarkManualTimes[data.origin] = data.benchmark;
             console.log(benchmarkManualTimes)
+            break;
         case "mixerSignal":
             console.log("Got mixer signal from: " + data.origin);
             break;
