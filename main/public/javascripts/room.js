@@ -36,22 +36,16 @@ let statsInterval = null;
 let timestampStart = -1;
 
 
-
 //Variables for network etc
 
 let localVid = document.getElementById('local-video');
 localVid.addEventListener("click", () => {
-    if (nonMixerStreamsPaused) {
-        resumeNonMixerStreams();
-        nonMixerStreamsPaused = false;
-    } else {
-        pauseNonMixerStreams();
-        nonMixerStreamsPaused = true;
-    }
+    let time = new Date(tsync.now())
+    console.log(time.getTime())
 });
 const sendFileButton = document.querySelector('button#sendFile');
 sendFileButton.addEventListener('click', () => {
-    if(!filetransfer.fileEmpty()) {
+    if (!filetransfer.fileEmpty()) {
         sendMetaData()
     }
 })
@@ -74,9 +68,7 @@ let frameEncodeTimes = {};
 let benchmarkBuffers = {};
 let benchmarkResponses = {};
 let peerElectionPoints = {};
-let fuckThis = {};
-fuckThis[nickName] = 0;
-console.log(fuckThis[nickName])
+
 let electionNum = 0;
 const benchmarkSize = 1024 * 1024 * 4; // 4000kbytes = 4MB
 const benchmarkPackSize = 1024 * 8 // 8 Kbytes
@@ -87,25 +79,23 @@ console.log(benchmarkPacketNums)
 
 var tsync = timesync.create({
     peers: [], // start empty, will be updated at the start of every synchronization
-    interval: 500000,
+    interval: 5000,
     delay: 200,
     timeout: 1000
 });
 
 
-
-
 function hashCode(string) {
     var hash = 0, i, chr;
     for (i = 0; i < string.length; i++) {
-        chr   = string.charCodeAt(i);
-        hash  = ((hash << 5) - hash) + chr;
+        chr = string.charCodeAt(i);
+        hash = ((hash << 5) - hash) + chr;
         hash |= 0; // Convert to 32bit integer
     }
     return hash;
 }
 
-function sendMetaData(){
+function sendMetaData() {
     let file = fileInput.files[0];
     console.log(file);
     file.text().then(
@@ -217,15 +207,23 @@ function authenticateUser() {
             }
             return Promise.resolve();
         }
-        tsync.on('sync', function(state) {
+        tsync.on('sync', function (state) {
             //console.log("sync " + state)
             if (state == "start") {
                 tsync.options.peers = Object.keys(dataChannels)
             }
+        });
         console.log("Setup finished");
+    }).then(r => {
+        setInterval(_ => {
+            let time = new Date(tsync.now())
+            console.log(time.getTime())
+        }, 1000 * 10);
     });
 }
 
+let d = new Date();
+console.log(d.getTime())
 authenticateUser();
 
 async function bootAndGetSocket() {
@@ -576,7 +574,7 @@ async function bitRateEveryone() {
     }
 }
 
-setInterval(bitRateEveryone, 1000 * 30);
+setInterval(bitRateEveryone, 1000 * 2);
 
 function bitRateBenchMark(socketID) {
     if (!bitRates[socketID]) {
@@ -651,7 +649,6 @@ function sendToAll(data) {
     }
 }
 
-let peerElectionPoints = {}
 
 function rankAndAwardMixerPoints() {
     let bitRatePool = 0;
@@ -688,6 +685,8 @@ function rankAndAwardMixerPoints() {
         points: myOutGoingPoints
     }
     sendToAll(JSON.stringify(electionObject));
+    electionPointsReceived[socket.id] = true;
+    electMixersIfValid()
 }
 
 
@@ -719,6 +718,16 @@ function electMixers(mixerSpots) {
     }
 }
 
+function electMixersIfValid() {
+    for (const [sock, _] of Object.entries(electionPointsReceived)) {
+        if (electionPointsReceived[sock] === false) {
+            console.log(sock + " has value " + electionPointsReceived[sock])
+            return;
+        }
+    }
+    electMixers(1);
+}
+
 function onReceiveMessageCallback(event) {
     // console.log(`Received Message ${event.data}`);
     let data = JSON.parse(event.data)
@@ -733,13 +742,7 @@ function onReceiveMessageCallback(event) {
                 console.log(id + " got " + votes + " from " + data.origin);
             }
             electionPointsReceived[data.origin] = true;
-            for (const [sock, _] of Object.entries(electionPointsReceived)) {
-                if (electionPointsReceived[sock] === false) {
-                    console.log(sock + " has value " + electionPointsReceived[sock])
-                    return;
-                }
-            }
-            electMixers(1);
+            electMixersIfValid()
             break;
         case "chat":
             postChatMessage(data.message, data.nickname)
@@ -755,9 +758,9 @@ function onReceiveMessageCallback(event) {
             console.log("buffer")
             console.log(buffer)
             receiveBuffers[data.hash].push(buffer);
-            console.log("old size: "+filemetadata[data.hash].receivedSize)
+            console.log("old size: " + filemetadata[data.hash].receivedSize)
             filemetadata[data.hash].receivedSize += buffer.byteLength
-            console.log("new size: "+filemetadata[data.hash].receivedSize)
+            console.log("new size: " + filemetadata[data.hash].receivedSize)
             // we are assuming that our signaling protocol told
             // about the expected file size (and name, hash, etc).
             if (filemetadata[data.hash].receivedSize === filemetadata[data.hash].size) {
@@ -784,7 +787,7 @@ function onReceiveMessageCallback(event) {
             }
             data.buff.forEach(byte => benchmarkBuffers[data.origin].push(byte));
             if (benchmarkBuffers[data.origin].length === benchmarkSize) {
-                var d = new Date(); // for now
+                var d = new Date(tsync.now()); // for now
                 let deltaTS = (d.getTime() - data.ts) / 1000; //Diff in seconds
                 let speed = benchmarkSize / deltaTS;
                 let mBSSpeed = speed / (1024 * 1024);
@@ -835,8 +838,8 @@ function onReceiveMessageCallback(event) {
             if (allPeersReady) {
                 filetransfer.sendData(dataChannels, data.hash, nickName)
             } else {
-                console.log("peersReady: "+nmbrOfPeersReady)
-                console.log("datachannel length: "+ dataChannelsLength)
+                console.log("peersReady: " + nmbrOfPeersReady)
+                console.log("datachannel length: " + dataChannelsLength)
             }
             break;
         case "timesync":
@@ -859,10 +862,11 @@ function sendMixerSignal() {
     }
     sendToAll(JSON.stringify(data));
 }
+
 function decode(str) {
     var buf = new ArrayBuffer(str.length); // 2 bytes for each char
     var bufView = new Uint8Array(buf);
-    for (var i=0, strLen=str.length; i < strLen; i++) {
+    for (var i = 0, strLen = str.length; i < strLen; i++) {
         bufView[i] = str.charCodeAt(i);
     }
     return buf;
@@ -898,7 +902,6 @@ async function postChatMessage(str, nickname) {
         chatloglist.appendChild(chatEntryItem);
     }
 }
-
 
 
 function openPage(pageName, elmnt, color) {
