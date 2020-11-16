@@ -66,7 +66,8 @@ let nickName = "Anonymous";
 let bitRates = {};
 let frameEncodeTimes = {};
 let benchmarkBuffers = {};
-let benchmarkManualTimes = {};
+let benchmarkResponses = {};
+let electionNum = 0;
 const benchmarkSize = 1024 * 1024 * 4; // 4000kbytes = 4MB
 const benchmarkPackSize = 1024 * 8 // 8 Kbytes
 const benchmarkPacketNums = (benchmarkSize) / (benchmarkPackSize)
@@ -213,7 +214,6 @@ async function bootAndGetSocket() {
                 filetransfer.configureChannel(dataChannel)
                 dataChannels[data.socket] = dataChannel
             }
-            console.log(dataChannels)
         })
         RTCConnections[data.socket].ondatachannel = (event) => {
             if (!dataChannels[data.socket]) {
@@ -222,7 +222,6 @@ async function bootAndGetSocket() {
                 filetransfer.configureChannel(dataChannel)
                 dataChannels[data.socket] = dataChannel
             }
-            console.log(dataChannels)
         }
         socket.emit("make-answer", {
             answer,
@@ -488,15 +487,16 @@ function becomeMixer() {
     }
 }
 
-function bitRateEveryone() {
+async function bitRateEveryone() {
     for (const [sock, _] of Object.entries(RTCConnections)) {
         bitRateBenchMark(sock);
+        if (bitRates[sock].length === 5) {
+            await benchMarkPeer(sock);
+        }
     }
-    console.log(bitRates)
-    console.log(frameEncodeTimes)
 }
 
-setInterval(bitRateEveryone, 1000 * 30);
+setInterval(bitRateEveryone, 1000 * 10);
 
 function bitRateBenchMark(socketID) {
     if (!bitRates[socketID]) {
@@ -543,7 +543,7 @@ function bitRateBenchMark(socketID) {
     });
 }
 
-function benchMarkPeer(socketID) {
+async function benchMarkPeer(socketID) {
     if (dataChannels.hasOwnProperty(socketID)) {
         //This part benchmarks by sending out 4mb arrays to each peer (array in segment of 8kb)
         var d = new Date(); // for now
@@ -563,12 +563,49 @@ function benchMarkPeer(socketID) {
     } else {
         console.log("Tried to benchmark a non-existing datachannel socket: " + socketID)
     }
-
 }
 
 function sendToAll(data) {
     for (const [_, dc] of Object.entries(dataChannels)) {
         dc.send(data)
+    }
+}
+
+let peerElectionPoints = {}
+
+function rankAndSelectMixer() {
+    let bitRatePool = 0;
+    let totalEncodingTime = 0;
+    let totalArraySpeed = 0;
+    console.log(benchmarkResponses)
+    //benchmarkResponses[data.origin]["arraySpeed"]
+    //benchmarkResponses[data.origin]["avgEncodingSpeed"]
+    for (const [sock, _] of Object.entries(benchmarkResponses)) {
+        totalEncodingTime += benchmarkResponses[sock]["avgEncodingSpeed"];
+        totalArraySpeed += benchmarkResponses[sock]["arraySpeed"];
+        if (!peerElectionPoints.hasOwnProperty(sock)) {
+            peerElectionPoints[sock] = 0;
+        }
+    }
+    for (const [_, ratesArray] of Object.entries(bitRates)) {
+        console.log("Points: " + ratesArray);
+        console.log("Points length: " + ratesArray.length)
+        let totalAverage = ratesArray.reduce((sum, num) => sum + num) / ratesArray.length
+        console.log("Points average: " + totalAverage);
+        bitRatePool += totalAverage;
+    }
+    for (const [sock, _] of Object.entries(benchmarkResponses)) {
+        let points = 0;
+        let peerAverage = bitRates[sock].reduce((sum, num) => sum + num) / bitRates[sock].length
+        let peerAveragePoints = peerAverage / bitRatePool * 100;
+        let frameEncodingPoints = totalEncodingTime / benchmarkResponses[sock]["avgEncodingSpeed"] * 100;
+        let arrayTransferPoints = benchmarkResponses[sock]["arraySpeed"] / totalArraySpeed * 100;
+        console.log("Points to " + sock + " from bitrate: " + peerAveragePoints)
+        console.log("Points to " + sock + " from frames: " + frameEncodingPoints)
+        console.log("Points to " + sock + " from array: " + arrayTransferPoints)
+
+        points = peerAveragePoints + frameEncodingPoints + arrayTransferPoints;
+        peerElectionPoints[sock] += points;
     }
 }
 
@@ -610,32 +647,35 @@ function onReceiveMessageCallback(event) {
             if (!benchmarkBuffers.hasOwnProperty(data.origin)) {
                 benchmarkBuffers[data.origin] = [];
             }
-            console.log(benchmarkBuffers[data.origin].length)
-            console.log(benchmarkSize)
-
             data.buff.forEach(byte => benchmarkBuffers[data.origin].push(byte));
             if (benchmarkBuffers[data.origin].length === benchmarkSize) {
                 var d = new Date(); // for now
-                console.log(d.getTime())
-                console.log(data.ts)
-
                 let deltaTS = (d.getTime() - data.ts) / 1000; //Diff in seconds
                 let speed = benchmarkSize / deltaTS;
                 let mBSSpeed = speed / (1024 * 1024);
-                console.log("I AM SPEED mb/s: " + mBSSpeed);
-                benchmarkManualTimes[data.origin] = mBSSpeed;
-                let response = {
-                    type: "benchMarkResponse",
-                    origin: socket.id,
-                    benchmark: mBSSpeed
-                }
+                benchmarkResponses[data.origin] = mBSSpeed;
+                console.log("Frames wtf: " + frameEncodeTimes[data.origin])
+                let avgEncoding = frameEncodeTimes[data.origin].reduce((sum, num) => {
+                    return sum + num
+                }) / frameEncodeTimes[data.origin].length;
+                console.log("Frames wtf2: " + avgEncoding)
+
+                let
+                    response = {
+                        type: "benchMarkResponse",
+                        origin: socket.id,
+                        benchmark: mBSSpeed,
+                        avgEncodingSpeed: avgEncoding
+                    }
                 dataChannels[data.origin].send(JSON.stringify(response))
                 benchmarkBuffers[data.origin] = [];
             }
             break;
         case "benchMarkResponse":
-            benchmarkManualTimes[data.origin] = data.benchmark;
-            console.log(benchmarkManualTimes)
+            benchmarkResponses[data.origin] = {};
+            benchmarkResponses[data.origin]["arraySpeed"] = data.benchmark;
+            benchmarkResponses[data.origin]["avgEncodingSpeed"] = data.benchmark;
+            if (Object.keys(benchmarkResponses.length === roomConnectionsSet.size)) rankAndSelectMixer()
             break;
         case "mixerSignal":
             console.log("Got mixer signal from: " + data.origin);

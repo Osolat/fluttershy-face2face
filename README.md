@@ -14,8 +14,37 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
         - (done) Test and get speed of sending a predeterminate amount of bytes (mb/s estimate)
         - (done) Get bitrate of video channel between peers
         - (done) Get encoding time per video channel
-        - Use above to pick a strong client
-    - Mixer election protocol
+    - Mixer election protocol (multiple mixers)
+    - Mixer election protocol (single mixer)
+        - Some client prompts the need for a mixer peer
+            - Experiences laggy video
+            - Experiences slow connection
+            - Other heuristics
+            - HARDCODE that the room needs n mixer peers (alternative to client starting the protocol)
+        - Client.electMixers(nMixers, electionNum)
+            - For each peer, check if there is at least 5 bitrate reports (20s per report = 100s of average bitrate)
+                - Includes encoding times
+                - If one is lacking, delay election
+            - For each peer, send out 2mb array
+                - message object = (signaltype, array, origin, electionNum)
+                - Determine a band speed from this
+                - response object = (signal, speed, origin, averageEncodingTime, electionNum)
+            - Await responses from all peers
+                - Rank bitrates
+                    - Pool average bitrates together
+                    - Award points = peerAvgBitrates/TotalAverage * 100%
+                - Rank frameEncodingTime
+                    - Award points = TotalEncodeTime/peerEncodeTime
+                - Rank array transfer time
+                    - Award points = peerSpeed/ TotalSpeed * 100%
+            - Send points to all
+            - Await points from all
+                - Pick n highest ranked peers as mixers
+                    - If just one mixer, and client is not mixer -> immediately freeze encodings non-mixers
+                    - If just one mixer, and client becomes mixer -> switch to mixer mode and keep streaming to all
+                - // message object (signal, n-array of ranked mixers, origin, electionNum)
+
+            
 
 - Use auto-merge library to have collabarative text editing
 
@@ -48,6 +77,7 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
     - Find a way to mash video streams together (video)
     - Find a way to mash video streams together (audio)
     - Change mixer on runtime, instead of hardcoding on launch
+    - Enable the pausing of streams so only peers have to encode to the mixer
     - (Find a way to establish 'strong' clients from 'weak' clients)
             - (done) Test and get speed of sending a predeterminate amount of bytes (mb/s estimate)
             - (done) Get bitrate of video channel between peers
