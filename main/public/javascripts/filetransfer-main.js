@@ -141,7 +141,7 @@ function sendData(sendChannels, hash, sender) {
                 hash: hash,
                 payload: strCode
             })
-            for (const [_, dc] of Object.entries(dataChannels)) {
+            for (const [_, dc] of Object.entries(sendChannels)) {
                 dc.send(JSONdata)
             };
             offset += buffer.byteLength;

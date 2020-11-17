@@ -1,5 +1,6 @@
 import * as filetransfer from './filetransfer-main.js'
 
+
 //Basic button setup
 const textInput = $("#chat-text-input");
 textInput.on("keypress", function (event) {
@@ -36,6 +37,7 @@ let statsInterval = null;
 let timestampStart = -1;
 
 
+
 //Variables for network etc
 /*const popUpBut = document.querySelector('button#audio-popup-button');
 popUpBut.addEventListener('click', () => {
@@ -70,6 +72,18 @@ const benchmarkSize = 1024 * 1024 * 4; // 4000kbytes = 4MB
 const benchmarkPackSize = 1024 * 8 // 8 Kbytes
 const benchmarkPacketNums = (benchmarkSize) / (benchmarkPackSize)
 console.log(benchmarkPacketNums)
+
+// for timesync
+
+var tsync = timesync.create({
+    peers: [], // start empty, will be updated at the start of every synchronization
+    interval: 500000,
+    delay: 200,
+    timeout: 1000
+});
+
+
+
 
 function hashCode(string) {
     var hash = 0, i, chr;
@@ -176,7 +190,31 @@ function authenticateUser() {
     const header = document.getElementById("room-header-id");
     header.innerHTML = decodeURI(roomID);
     socket = io.connect(window.location.hostname, {query: {"group-id": roomID}});
-    bootAndGetSocket().then(r => console.log("Setup finished"));
+    bootAndGetSocket().then(r => {
+        tsync.send = function (id, data, timeout) {
+            //console.log('send', id, data);
+            //console.log(socket.id)
+            let packetString = JSON.stringify({
+                type: "timesync",
+                from: socket.id,
+                tsdata: data,
+            })
+            let channel = dataChannels[id];
+            if (channel) {
+                channel.send(packetString);
+            } else {
+                console.log(new Error('Cannot send message: not connected to ' + id).toString());
+            }
+            return Promise.resolve();
+        }
+        tsync.on('sync', function(state) {
+            //console.log("sync " + state)
+            if (state == "start") {
+                tsync.options.peers = Object.keys(dataChannels)
+            }
+        })
+        console.log("Setup finished")
+    });
 }
 
 authenticateUser();
@@ -438,7 +476,9 @@ function sendToAll(data) {
 
 
 function onReceiveMessageCallback(event) {
-    console.log(`Received Message ${event.data}`);
+    if (event.type != "timesync") {
+        console.log(`Received Message ${event.data}`);
+    }
     let data = JSON.parse(event.data)
     let replyChannel = event.target;
     switch (data.type) {
@@ -528,13 +568,21 @@ function onReceiveMessageCallback(event) {
             break;
         case "file-callback":
             peersReady[data.hash]++
-            let len = Object.keys(dataChannels).length
-            if (peersReady[data.hash] == len) {
+            let nmbrOfPeersReady = peersReady[data.hash]
+            let dataChannelsLength = Object.keys(dataChannels).length
+            let allPeersReady = nmbrOfPeersReady == dataChannelsLength
+            if (allPeersReady) {
                 filetransfer.sendData(dataChannels, data.hash, nickName)
             } else {
-                console.log("peersReady: "+peersReady[data.hash])
-                console.log("datachannel length: "+len)
+                console.log("peersReady: "+nmbrOfPeersReady)
+                console.log("datachannel length: "+ dataChannelsLength)
             }
+            break;
+        case "timesync":
+            let parsedData = data.tsdata;
+            tsync.receive(data.from, parsedData)
+            //let date = new Date(tsync.now())
+            //console.log("date: "+date)
             break;
         default:
             console.log("error: unknown message data type or malformed JSON format")
