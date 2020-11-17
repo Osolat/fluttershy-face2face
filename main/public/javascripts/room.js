@@ -506,7 +506,7 @@ async function bitRateEveryone() {
     }
 }
 
-setInterval(bitRateEveryone, 1000 * 2);
+setInterval(bitRateEveryone, 1000 * 30);
 
 function bitRateBenchMark(socketID) {
     if (!bitRates[socketID]) {
@@ -586,8 +586,6 @@ function rankAndAwardMixerPoints() {
     let bitRatePool = 0;
     let totalEncodingTime = 0;
     let totalArraySpeed = 0;
-    //benchmarkResponses[data.origin]["arraySpeed"]
-    //benchmarkResponses[data.origin]["avgEncodingSpeed"]
     for (const [sock, _] of Object.entries(benchmarkResponses)) {
         totalEncodingTime += benchmarkResponses[sock]["avgEncodingSpeed"];
         totalArraySpeed += benchmarkResponses[sock]["arraySpeed"];

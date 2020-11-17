@@ -4,47 +4,14 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
 # Priority (main features)
 - Implement file sharing system
     - Display Shared files (immutable)
-    - Download link shows up in chatlogs
-- Chat system
+    - (Done) Download link shows up in chatlogs
 
 - Tracking of network activity for topology / visual representation of network for debugging/presentation (graph)
-
+    - Mixing peer nodes should be from mixingPeers (array)
+    
 - Support new p2p topologies 
-    - Find a way to establish 'strong' clients from 'weak' clients
-        - (done) Test and get speed of sending a predeterminate amount of bytes (mb/s estimate)
-        - (done) Get bitrate of video channel between peers
-        - (done) Get encoding time per video channel
-    - Mixer election protocol (multiple mixers)
-    - Mixer election protocol (single mixer)
-        - Some client prompts the need for a mixer peer
-            - Experiences laggy video
-            - Experiences slow connection
-            - Other heuristics
-            - HARDCODE that the room needs n mixer peers (alternative to client starting the protocol)
-        - Client.electMixers(nMixers, electionNum)
-            - For each peer, check if there is at least 5 bitrate reports (20s per report = 100s of average bitrate)
-                - Includes encoding times
-                - If one is lacking, delay election
-            - For each peer, send out 2mb array
-                - message object = (signaltype, array, origin, electionNum)
-                - Determine a band speed from this
-                - response object = (signal, speed, origin, averageEncodingTime, electionNum)
-            - Await responses from all peers
-                - Rank bitrates
-                    - Pool average bitrates together
-                    - Award points = peerAvgBitrates/TotalAverage * 100%
-                - Rank frameEncodingTime
-                    - Award points = TotalEncodeTime/peerEncodeTime
-                - Rank array transfer time
-                    - Award points = peerSpeed/ TotalSpeed * 100%
-            - Send points to all
-            - Await points from all
-                - Pick n highest ranked peers as mixers
-                    - If just one mixer, and client is not mixer -> immediately freeze encodings non-mixers
-                    - If just one mixer, and client becomes mixer -> switch to mixer mode and keep streaming to all
-                - // message object (signal, n-array of ranked mixers, origin, electionNum)
-
-            
+    - Mixer election protocol (multiple mixers)   
+- Set up Pumba testing environment
 
 - Use auto-merge library to have collabarative text editing
 
@@ -65,6 +32,8 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
 - Nice to have chat commands
 
 # Done 
+- Chat system
+
 - Need new main page
     - Join group chat by ID
         - Optionally with password for room
@@ -74,6 +43,40 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
     - Set password to group?
     
 - (Support new p2p topologies)
+    - - (Done) Find a way to establish 'strong' clients from 'weak' clients
+              - (done) Test and get speed of sending a predeterminate amount of bytes (mb/s estimate)
+              - (done) Get bitrate of video channel between peers
+              - (done) Get encoding time per video channel
+          - Mixer election protocol (multiple mixers)
+          - (Done) Mixer election protocol (single mixer)
+              - Some client prompts the need for a mixer peer
+                  - Experiences laggy video
+                  - Experiences slow connection
+                  - Other heuristics
+                  - HARDCODE that the room needs n mixer peers (alternative to client starting the protocol)
+              - Client.electMixers(nMixers, electionNum)
+                  - For each peer, check if there is at least 5 bitrate reports (20s per report = 100s of average bitrate)
+                      - Includes encoding times
+                      - If one is lacking, delay election
+                  - For each peer, send out 2mb array
+                      - message object = (signaltype, array, origin, electionNum)
+                      - Determine a band speed from this
+                      - response object = (signal, speed, origin, averageEncodingTime, electionNum)
+                  - Await responses from all peers
+                      - Rank bitrates
+                          - Pool average bitrates together
+                          - Award points = peerAvgBitrates/TotalAverage * 100%
+                      - Rank frameEncodingTime
+                          - Award points = TotalEncodeTime/peerEncodeTime
+                      - Rank array transfer time
+                          - Award points = peerSpeed/ TotalSpeed * 100%
+                  - Send points to all
+                  - Await points from all
+                      - Pick n highest ranked peers as mixers
+                          - If just one mixer, and client is not mixer -> immediately freeze encodings non-mixers
+                          - If just one mixer, and client becomes mixer -> switch to mixer mode and keep streaming to all
+                      - // message object (signal, n-array of ranked mixers, origin, electionNum)
+
     - Find a way to mash video streams together (video)
     - Find a way to mash video streams together (audio)
     - Change mixer on runtime, instead of hardcoding on launch
