@@ -57,6 +57,7 @@ var RTCConnectionsCallStatus = {};
 var roomConnectionsSet = new Set();
 var activeConnectionSize = 0;
 let RTCConnectionNames = {};
+let electionPointsReceived = {}
 var isMixingPeer = false;
 let nonMixerStreamsPaused = false;
 let mixingPeers = [];
@@ -67,6 +68,10 @@ let bitRates = {};
 let frameEncodeTimes = {};
 let benchmarkBuffers = {};
 let benchmarkResponses = {};
+let peerElectionPoints = {};
+let fuckThis = {};
+fuckThis[nickName] = 0;
+console.log(fuckThis[nickName])
 let electionNum = 0;
 const benchmarkSize = 1024 * 1024 * 4; // 4000kbytes = 4MB
 const benchmarkPackSize = 1024 * 8 // 8 Kbytes
@@ -145,7 +150,10 @@ function authenticateUser() {
     const header = document.getElementById("room-header-id");
     header.innerHTML = decodeURI(roomID);
     socket = io.connect(window.location.hostname, {query: {"group-id": roomID}});
-    bootAndGetSocket().then(r => console.log("Setup finished"));
+    bootAndGetSocket().then(r => {
+        peerElectionPoints[socket.id] = 0;
+        console.log("Setup finished");
+    });
 }
 
 authenticateUser();
@@ -173,6 +181,7 @@ async function bootAndGetSocket() {
         const elToRemove = document.getElementById(socketId);
         if (elToRemove) {
             delete RTCConnections[socketId];
+            delete electionPointsReceived[socketId];
             activeConnectionSize--;
             delete RTCConnectionsCallStatus[socketId];
             delete RTCConnectionNames[socketId];
@@ -279,6 +288,9 @@ function initNewRTCConnection(socketId) {
     ctxMix.rect(0, 0, widestVid, tallestVid);
     ctxMix.fillStyle = "black";
     ctxMix.fill();
+    // Some other init tied to the connection
+    electionPointsReceived[socketId] = false;
+    console.log("Init?? :" + socketId)
 }
 
 function muteRemoteVideos() {
@@ -476,9 +488,7 @@ function becomeMixer() {
         }
     }
     for (const [sock, _] of Object.entries(RTCConnections)) {
-        console.log(RTCConnections[sock].getSenders());
         for (let i = 0; i < tracks.length; i++) {
-            console.log(tracks[i].kind);
             var sender = RTCConnections[sock].getSenders().find(function (s) {
                 return s.track.kind === tracks[i].kind;
             });
@@ -496,7 +506,7 @@ async function bitRateEveryone() {
     }
 }
 
-setInterval(bitRateEveryone, 1000 * 10);
+setInterval(bitRateEveryone, 1000 * 2);
 
 function bitRateBenchMark(socketID) {
     if (!bitRates[socketID]) {
@@ -571,13 +581,11 @@ function sendToAll(data) {
     }
 }
 
-let peerElectionPoints = {}
 
-function rankAndSelectMixer() {
+function rankAndAwardMixerPoints() {
     let bitRatePool = 0;
     let totalEncodingTime = 0;
     let totalArraySpeed = 0;
-    console.log(benchmarkResponses)
     //benchmarkResponses[data.origin]["arraySpeed"]
     //benchmarkResponses[data.origin]["avgEncodingSpeed"]
     for (const [sock, _] of Object.entries(benchmarkResponses)) {
@@ -588,24 +596,57 @@ function rankAndSelectMixer() {
         }
     }
     for (const [_, ratesArray] of Object.entries(bitRates)) {
-        console.log("Points: " + ratesArray);
-        console.log("Points length: " + ratesArray.length)
         let totalAverage = ratesArray.reduce((sum, num) => sum + num) / ratesArray.length
-        console.log("Points average: " + totalAverage);
         bitRatePool += totalAverage;
     }
+    let myOutGoingPoints = {}
     for (const [sock, _] of Object.entries(benchmarkResponses)) {
         let points = 0;
         let peerAverage = bitRates[sock].reduce((sum, num) => sum + num) / bitRates[sock].length
         let peerAveragePoints = peerAverage / bitRatePool * 100;
         let frameEncodingPoints = totalEncodingTime / benchmarkResponses[sock]["avgEncodingSpeed"] * 100;
         let arrayTransferPoints = benchmarkResponses[sock]["arraySpeed"] / totalArraySpeed * 100;
-        console.log("Points to " + sock + " from bitrate: " + peerAveragePoints)
-        console.log("Points to " + sock + " from frames: " + frameEncodingPoints)
-        console.log("Points to " + sock + " from array: " + arrayTransferPoints)
-
-        points = peerAveragePoints + frameEncodingPoints + arrayTransferPoints;
+        points = Math.floor(peerAveragePoints + frameEncodingPoints + arrayTransferPoints);
+        myOutGoingPoints[sock] = points;
+        console.log("I am here, my count prior to awarding to: " + sock + " is " + peerElectionPoints[sock])
         peerElectionPoints[sock] += points;
+        console.log("I am here, after awarding to " + sock + " is " + peerElectionPoints[sock] + "  (+" + points + ")")
+
+    }
+    let electionObject = {
+        type: "electionPoints",
+        origin: socket.id,
+        points: myOutGoingPoints
+    }
+    sendToAll(JSON.stringify(electionObject));
+}
+
+
+function electMixers(mixerSpots) {
+    // Create items array
+    console.log("Printing Election Results")
+    for (const [sock, points] of Object.entries(peerElectionPoints)) {
+        console.log(sock + " has " + points);
+    }
+    var candidates = Object.keys(peerElectionPoints).map(function (key) {
+        return [key, peerElectionPoints[key]];
+    });
+
+// Sort the array based on the second element
+    candidates.sort(function (first, second) {
+        if (first[1] === second[1]) return second[0].localeCompare(first[0]);
+        return second[1] - first[1];
+    });
+
+// Create a new array with only the first 5 items
+    console.log(candidates)
+    let ranked = candidates.slice(0, mixerSpots);
+    if (ranked[0][0] === socket.id) {
+        console.log("I became mixer")
+        becomeMixer();
+    } else {
+        mixingPeers.push(ranked[0][0])
+        pauseNonMixerStreams();
     }
 }
 
@@ -613,6 +654,23 @@ function onReceiveMessageCallback(event) {
     // console.log(`Received Message ${event.data}`);
     let data = JSON.parse(event.data)
     switch (data.type) {
+        case "electionPoints":
+            for (const [id, votes] of Object.entries(data.points)) {
+                if (!peerElectionPoints.hasOwnProperty(id)) {
+                    peerElectionPoints[id] = 0;
+                }
+                peerElectionPoints[id] = peerElectionPoints[id] + votes;
+                console.log(id + " got " + votes + " from " + data.origin);
+            }
+            electionPointsReceived[data.origin] = true;
+            for (const [sock, _] of Object.entries(electionPointsReceived)) {
+                if (electionPointsReceived[sock] === false) {
+                    console.log(sock + " has value " + electionPointsReceived[sock])
+                    return;
+                }
+            }
+            electMixers(1);
+            break;
         case "chat":
             postChatMessage(data.message, data.nickname)
             break;
@@ -653,12 +711,10 @@ function onReceiveMessageCallback(event) {
                 let deltaTS = (d.getTime() - data.ts) / 1000; //Diff in seconds
                 let speed = benchmarkSize / deltaTS;
                 let mBSSpeed = speed / (1024 * 1024);
-                benchmarkResponses[data.origin] = mBSSpeed;
-                console.log("Frames wtf: " + frameEncodeTimes[data.origin])
+                //benchmarkResponses[data.origin] = mBSSpeed;
                 let avgEncoding = frameEncodeTimes[data.origin].reduce((sum, num) => {
                     return sum + num
                 }) / frameEncodeTimes[data.origin].length;
-                console.log("Frames wtf2: " + avgEncoding)
 
                 let
                     response = {
@@ -675,7 +731,7 @@ function onReceiveMessageCallback(event) {
             benchmarkResponses[data.origin] = {};
             benchmarkResponses[data.origin]["arraySpeed"] = data.benchmark;
             benchmarkResponses[data.origin]["avgEncodingSpeed"] = data.benchmark;
-            if (Object.keys(benchmarkResponses.length === roomConnectionsSet.size)) rankAndSelectMixer()
+            if (Object.keys(benchmarkResponses).length === roomConnectionsSet.size) rankAndAwardMixerPoints()
             break;
         case "mixerSignal":
             console.log("Got mixer signal from: " + data.origin);
