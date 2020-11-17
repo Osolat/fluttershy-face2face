@@ -42,7 +42,7 @@ async function createNewRoom(browser, groupName, password) {
 async function joinExisting(joinerBrowser, groupName, password) {
     const joinerPage = await joinerBrowser.newPage();
     if (logging) {
-        page
+        joinerPage
             .on('console', message =>
                 console.log(`${message.type().substr(0, 3).toUpperCase()} ${message.text()}`))
             .on('pageerror', ({message}) => console.log(message))
@@ -99,6 +99,18 @@ async function joinPreExistingRoom(groupName, password) {
     await joinerBrowser.close();
 }
 
+async function joinPreExistingRoomAndHang(groupName, password) {
+    const joinerBrowser = await puppeteer.launch({
+        args: [
+            '--use-fake-ui-for-media-stream',
+            '--use-fake-device-for-media-stream'
+        ]
+    });
+    let joinerPage = joinExisting(joinerBrowser, groupName, password)
+    await joinerPage.screenshot({path: 'test-dls/joinExistingHang.png'});
+    await joinerBrowser.close();
+}
+
 async function testCreateRoom(groupName, password) {
     const browser = await puppeteer.launch({
         args: [
@@ -110,7 +122,9 @@ async function testCreateRoom(groupName, password) {
     await browser.close();
 }
 
-let logging = false;
+let logging = true;
+joinPreExistingRoomAndHang("Russia", "1234").then(r => console.log("blyat"));
+/*
 screenCapMainPage().then(r => console.log("screenCapMainPage test done"));
 testCreateRoom("Communism Carnival", "1234").then(r => console.log("testCreateRoom test done"));
-testCreateRoomAndJoin("Putin Zone", "1234").then(_ => console.log("testCreateRoomAndJoin test done"))
+testCreateRoomAndJoin("Putin Zone", "1234").then(_ => console.log("testCreateRoomAndJoin test done"))*/
