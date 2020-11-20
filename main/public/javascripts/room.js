@@ -40,8 +40,7 @@ let timestampStart = -1;
 
 let localVid = document.getElementById('local-video');
 localVid.addEventListener("click", () => {
-    let time = new Date(tsync.now())
-    console.log(time.getTime())
+    forceElection();
 });
 const sendFileButton = document.querySelector('button#sendFile');
 sendFileButton.addEventListener('click', () => {
@@ -68,7 +67,7 @@ let frameEncodeTimes = {};
 let benchmarkBuffers = {};
 let benchmarkResponses = {};
 let peerElectionPoints = {};
-
+let electionInitiated = false;
 let electionNum = 0;
 const benchmarkSize = 1024 * 1024 * 4; // 4000kbytes = 4MB
 const benchmarkPackSize = 1024 * 8 // 8 Kbytes
@@ -173,7 +172,7 @@ function drawVideoStripe(videoElement, index, memberSocket) {
 }
 
 function authenticateUser() {
-    var cook = document.cookie;
+    let cook = document.cookie;
     if (!cook) {
         window.location.replace("..");
     }
@@ -189,9 +188,10 @@ function authenticateUser() {
     const header = document.getElementById("room-header-id");
     header.innerHTML = decodeURI(roomID);
     socket = io.connect(window.location.hostname, {query: {"group-id": roomID}});
-    bootAndGetSocket().then(r => {
+    bootAndGetSocket().then(_ => {
         peerElectionPoints[socket.id] = 0;
-        tsync.send = function (id, data, timeout) {
+        electionPointsReceived[socket.id] = false
+        tsync.send = function (id, data, _) {
             //console.log('send', id, data);
             //console.log(socket.id)
             let packetString = JSON.stringify({
@@ -214,11 +214,6 @@ function authenticateUser() {
             }
         });
         console.log("Setup finished");
-    }).then(r => {
-        setInterval(_ => {
-            let time = new Date(tsync.now())
-            console.log(time.getTime())
-        }, 1000 * 10);
     });
 }
 
@@ -229,7 +224,7 @@ authenticateUser();
 async function bootAndGetSocket() {
     await initLocalStream();
     // TODO: Handle different room IDs.
-    socket.on('connect', (socket) => {
+    socket.on('connect', (_) => {
         console.log("Connected to discovery server through socket.");
     })
 
@@ -240,9 +235,6 @@ async function bootAndGetSocket() {
 
     socket.on("latest-names", (goym) => {
         RTCConnectionNames = JSON.parse(goym);
-        for (const property in RTCConnections) {
-            console.log(`${property}: ${RTCConnectionNames[property]}`);
-        }
     });
 
     socket.on("remove-user", ({socketId}) => {
@@ -267,7 +259,6 @@ async function bootAndGetSocket() {
             let newChannel = filetransfer.createChannel(RTCConnections[data.socket])
             newChannel.onmessage = onReceiveMessageCallback
             dataChannels[data.socket] = newChannel;
-            console.log(dataChannels)
         }
         if (!RTCConnectionsCallStatus[data.socket]) {
             callUser(data.socket);
@@ -290,6 +281,12 @@ async function bootAndGetSocket() {
                 dataChannel.onmessage = onReceiveMessageCallback;
                 filetransfer.configureChannel(dataChannel)
                 dataChannels[data.socket] = dataChannel
+                console.log("Mixing peers array: " + mixingPeers)
+                dataChannels[data.socket].send(JSON.stringify({
+                    type: "mixerStatus",
+                    origin: socket.id,
+                    mixers: mixingPeers
+                }))
             }
         })
         RTCConnections[data.socket].ondatachannel = (event) => {
@@ -298,6 +295,12 @@ async function bootAndGetSocket() {
                 dataChannel.onmessage = onReceiveMessageCallback;
                 filetransfer.configureChannel(dataChannel)
                 dataChannels[data.socket] = dataChannel
+                console.log("Mixing peers array: " + mixingPeers)
+                dataChannels[data.socket].send(JSON.stringify({
+                    type: "mixerStatus",
+                    origin: socket.id,
+                    mixers: mixingPeers
+                }))
             }
         }
         socket.emit("make-answer", {
@@ -349,16 +352,19 @@ function initNewRTCConnection(socketId) {
     RTCConnectionsCallStatus[socketId] = false;
     if (isMixingPeer) {
         window.localStream.getTracks().forEach(track => rtcConnection.addTrack(track, mixStream));
-    } else {
+    } else if (mixingPeers.length === 0) {
+        // If no mixing peers, we want to stream video to everyone
+        window.localStream.getTracks().forEach(track => rtcConnection.addTrack(track, window.localStream));
+    } else if (mixingPeers.contains(socketId)) {
+        // If there are mixing peers, we only want to stream video to the mixers
         window.localStream.getTracks().forEach(track => rtcConnection.addTrack(track, window.localStream));
     }
     ctxMix.beginPath();
     ctxMix.rect(0, 0, widestVid, tallestVid);
     ctxMix.fillStyle = "black";
     ctxMix.fill();
-    // Some other init tied to the connection
+// Some other init tied to the connection
     electionPointsReceived[socketId] = false;
-    console.log("Init?? :" + socketId)
 }
 
 function muteRemoteVideos() {
@@ -444,7 +450,7 @@ function toggleEncoding(id) {
     if (!stoppedStreams[id]) {
         let senders = RTCConnections[id].getSenders();
         for (let i = 0; i < senders.length; i++) {
-            senders[i].replaceTrack(null).then(r => console.log("Stopped a track"))
+            senders[i].replaceTrack(null).then(_ => console.log("Stopped a track"))
         }
         stoppedStreams[id] = true;
 
@@ -452,7 +458,7 @@ function toggleEncoding(id) {
         let tracks = window.localStream.getTracks();
         let senders = RTCConnections[id].getSenders();
         for (let i = 0; i < senders.length; i++) {
-            senders[i].replaceTrack(tracks[i]).then(r => console.log("Restarted a track"))
+            senders[i].replaceTrack(tracks[i]).then(_ => console.log("Restarted a track"))
         }
         stoppedStreams[id] = false;
     }
@@ -463,7 +469,7 @@ function pauseNonMixerStreams() {
         if (!mixingPeers.includes(sock)) {
             let senders = RTCConnections[sock].getSenders();
             for (let i = 0; i < senders.length; i++) {
-                senders[i].replaceTrack(null).then(r => console.log("Stopped a track"))
+                senders[i].replaceTrack(null).then(_ => console.log("Stopped a track"))
             }
         }
     }
@@ -475,34 +481,7 @@ function resumeNonMixerStreams() {
         if (!mixingPeers.includes(sock)) {
             let senders = RTCConnections[sock].getSenders();
             for (let i = 0; i < senders.length; i++) {
-                senders[i].replaceTrack(tracks[i]).then(r => console.log("Restarted a track"))
-            }
-        }
-    }
-}
-
-function toggleNonMixerStreams() {
-    // OLD + USELESS
-    // This method is meant to stop encoding videos, when we no longer want the mesh network
-    // So we only encode video to the mixing peer
-    if (!stoppedStream) {
-        for (const [sock, _] of Object.entries(RTCConnections)) {
-            if (!mixingPeers.includes(sock)) {
-                let senders = RTCConnections[sock].getSenders();
-                for (let i = 0; i < senders.length; i++) {
-                    senders[i].replaceTrack(null).then(r => console.log("Stopped a track"))
-                }
-            }
-        }
-        stoppedStream = true;
-    } else {
-        let tracks = window.localStream.getTracks();
-        for (const [sock, _] of Object.entries(RTCConnections)) {
-            if (!mixingPeers.includes(sock)) {
-                let senders = RTCConnections[sock].getSenders();
-                for (let i = 0; i < senders.length; i++) {
-                    senders[i].replaceTrack(tracks[i]).then(r => console.log("Restarted a track"))
-                }
+                senders[i].replaceTrack(tracks[i]).then(_ => console.log("Restarted a track"))
             }
         }
     }
@@ -560,21 +539,78 @@ function becomeMixer() {
             var sender = RTCConnections[sock].getSenders().find(function (s) {
                 return s.track.kind === tracks[i].kind;
             });
-            sender.replaceTrack(tracks[i]).then(r => "Replaced track");
+            sender.replaceTrack(tracks[i]).then(_ => "Replaced track");
         }
     }
+}
+
+let electionBenchMarksSent = false;
+
+async function evaluateElectionNeed(sock) {
+    // We want at least 5 reports before we can establish
+    if (electionInitiated && !electionBenchMarksSent) {
+        for (const [sock, _] of Object.entries(RTCConnections)) {
+            await benchMarkPeer(sock);
+        }
+        electionBenchMarksSent = true;
+    }
+    if (electionInitiated && electionBenchMarksSent) {
+        return
+    }
+    let electionNeeded = false;
+    if (bitRates[sock].length > 0) {
+        let res = lastResult[sock];
+        res.forEach(report => {
+            if (report.type === 'outbound-rtp') {
+                var str = report.id;
+                var str_pos = str.indexOf("Video");
+                if (!(str_pos > -1)) {
+                    // Ignores reports from 'audio' channels for instance. Video channels are the significant factor in bitrate
+                    return
+                }
+                if (report.isRemote) {
+                    return;
+                }
+                /*  console.log(report)
+                  console.log(Object.keys(report))*/
+                if (report.qualityLimitationResolutionChanges >= 5 || report.pliCount >= 3) {
+                    //Resolution changes is in-built webRTC. Resolution changes if GPU stutters or not enough broadband
+                    //pliCount is a packet response if video specifically drops a frame
+                    electionNeeded = true;
+                }
+            }
+        })
+    }
+    if (electionNeeded && !electionInitiated) {
+        console.log("I initiated an election")
+        electionInitiated = true;
+        let flag = {type: "initiateElection", origin: socket.id}
+        sendToAll(JSON.stringify(flag))
+        for (const [sock, _] of Object.entries(RTCConnections)) {
+            await benchMarkPeer(sock);
+        }
+        electionBenchMarksSent = true;
+    }
+}
+
+async function forceElection() {
+    electionInitiated = true;
+    let flag = {type: "initiateElection", origin: socket.id}
+    sendToAll(JSON.stringify(flag))
+    for (const [sock, _] of Object.entries(RTCConnections)) {
+        await benchMarkPeer(sock);
+    }
+    electionBenchMarksSent = true;
 }
 
 async function bitRateEveryone() {
     for (const [sock, _] of Object.entries(RTCConnections)) {
         bitRateBenchMark(sock);
-        if (bitRates[sock].length === 5) {
-            await benchMarkPeer(sock);
-        }
+        await evaluateElectionNeed(sock);
     }
 }
 
-setInterval(bitRateEveryone, 1000 * 2);
+setInterval(bitRateEveryone, 1000 * 15);
 
 function bitRateBenchMark(socketID) {
     if (!bitRates[socketID]) {
@@ -586,7 +622,7 @@ function bitRateBenchMark(socketID) {
         res.forEach(report => {
             let bytes;
             let headerBytes;
-            let packets;
+            //let packets;
             if (report.type === 'outbound-rtp') {
                 var str = report.id;
                 var str_pos = str.indexOf("Video");
@@ -600,8 +636,7 @@ function bitRateBenchMark(socketID) {
                 const now = report.timestamp;
                 bytes = report.bytesSent;
                 headerBytes = report.headerBytesSent;
-                packets = report.packetsSent;
-
+                //packets = report.packetsSent;
                 if (lastResult[socketID] && lastResult[socketID].has(report.id)) {
                     const deltaFrames = report.framesEncoded - lastResult[socketID].get(report.id).framesEncoded;
                     const deltaTimeF = report.totalEncodeTime - lastResult[socketID].get(report.id).totalEncodeTime;
@@ -610,8 +645,8 @@ function bitRateBenchMark(socketID) {
                     // calculate bitrate
                     const bitrate = 8 * (bytes - lastResult[socketID].get(report.id).bytesSent) /
                         deltaT;
-                    const headerrate = 8 * (headerBytes - lastResult[socketID].get(report.id).headerBytesSent) /
-                        deltaT;
+                    //const headerrate = 8 * (headerBytes - lastResult[socketID].get(report.id).headerBytesSent) /
+                    //    deltaT;
                     bitRates[socketID].push(bitrate);
                     frameEncodeTimes[socketID].push(avgFrameEncodeTimeSinceLast);
                 }
@@ -662,21 +697,35 @@ function rankAndAwardMixerPoints() {
         }
     }
     for (const [_, ratesArray] of Object.entries(bitRates)) {
+        if (ratesArray.length === 0) continue;
         let totalAverage = ratesArray.reduce((sum, num) => sum + num) / ratesArray.length
         bitRatePool += totalAverage;
     }
     let myOutGoingPoints = {}
     for (const [sock, _] of Object.entries(benchmarkResponses)) {
         let points = 0;
-        let peerAverage = bitRates[sock].reduce((sum, num) => sum + num) / bitRates[sock].length
-        let peerAveragePoints = peerAverage / bitRatePool * 100;
-        let frameEncodingPoints = totalEncodingTime / benchmarkResponses[sock]["avgEncodingSpeed"] * 100;
+        let peerAverage = 0;
+        if (bitRates.hasOwnProperty(sock) && bitRates[sock].length !== 0) {
+            peerAverage = bitRates[sock].reduce((sum, num) => sum + num) / bitRates[sock].length
+        }
+        let peerAveragePoints;
+        if (bitRatePool === 0) {
+            peerAveragePoints = 0;
+        } else {
+            peerAveragePoints = peerAverage / bitRatePool * 100;
+        }
+        //let frameEncodingPoints = totalEncodingTime / benchmarkResponses[sock]["avgEncodingSpeed"] * (1 / 100);
+        let frameEncodingPoints = -(benchmarkResponses[sock]["avgEncodingSpeed"] / totalEncodingTime * 100);
         let arrayTransferPoints = benchmarkResponses[sock]["arraySpeed"] / totalArraySpeed * 100;
+        console.log("Points awarded to " + sock)
+        console.log("Bitrate points: " + peerAveragePoints)
+        console.log("Frame points: " + frameEncodingPoints)
+        console.log("Frame time peer: " + benchmarkResponses[sock]["avgEncodingSpeed"])
+        console.log("Frame time total: " + totalEncodingTime)
+        console.log("Array points: " + arrayTransferPoints)
         points = Math.floor(peerAveragePoints + frameEncodingPoints + arrayTransferPoints);
         myOutGoingPoints[sock] = points;
-        console.log("I am here, my count prior to awarding to: " + sock + " is " + peerElectionPoints[sock])
         peerElectionPoints[sock] += points;
-        console.log("I am here, after awarding to " + sock + " is " + peerElectionPoints[sock] + "  (+" + points + ")")
 
     }
     let electionObject = {
@@ -711,6 +760,7 @@ function electMixers(mixerSpots) {
     let ranked = candidates.slice(0, mixerSpots);
     if (ranked[0][0] === socket.id) {
         console.log("I became mixer")
+        mixingPeers.push(ranked[0][0])
         becomeMixer();
     } else {
         mixingPeers.push(ranked[0][0])
@@ -720,6 +770,8 @@ function electMixers(mixerSpots) {
 
 function electMixersIfValid() {
     for (const [sock, _] of Object.entries(electionPointsReceived)) {
+        console.log("In loop, also I am " + socket.id)
+        console.log(sock)
         if (electionPointsReceived[sock] === false) {
             console.log(sock + " has value " + electionPointsReceived[sock])
             return;
@@ -781,7 +833,12 @@ function onReceiveMessageCallback(event) {
                 }
             }
             break;
+        case "initiateElection":
+            electionInitiated = true;
+            console.log("Got initiate election flag")
+            break;
         case "benchmarkOut":
+            console.log("Benchmark packet")
             if (!benchmarkBuffers.hasOwnProperty(data.origin)) {
                 benchmarkBuffers[data.origin] = [];
             }
@@ -791,10 +848,15 @@ function onReceiveMessageCallback(event) {
                 let deltaTS = (d.getTime() - data.ts) / 1000; //Diff in seconds
                 let speed = benchmarkSize / deltaTS;
                 let mBSSpeed = speed / (1024 * 1024);
+                let avgEncoding;
                 //benchmarkResponses[data.origin] = mBSSpeed;
-                let avgEncoding = frameEncodeTimes[data.origin].reduce((sum, num) => {
-                    return sum + num
-                }) / frameEncodeTimes[data.origin].length;
+                if (!frameEncodeTimes.hasOwnProperty(data.origin) || frameEncodeTimes[data.origin].length < 2) {
+                    avgEncoding = 0
+                } else {
+                    avgEncoding = frameEncodeTimes[data.origin].reduce((sum, num) => {
+                        return sum + num
+                    }) / frameEncodeTimes[data.origin].length;
+                }
 
                 let
                     response = {
@@ -807,7 +869,16 @@ function onReceiveMessageCallback(event) {
                 benchmarkBuffers[data.origin] = [];
             }
             break;
+        case "mixerStatus":
+            console.log("Here I am :" + data.mixers)
+            mixingPeers = data.mixers
+            if (mixingPeers.length !== 0) {
+                electionInitiated = true; //Election already held
+                pauseNonMixerStreams();
+            }
+            break;
         case "benchMarkResponse":
+            console.log("Got a benchmark back from " + data.origin)
             benchmarkResponses[data.origin] = {};
             benchmarkResponses[data.origin]["arraySpeed"] = data.benchmark;
             benchmarkResponses[data.origin]["avgEncodingSpeed"] = data.benchmark;
