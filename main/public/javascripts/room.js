@@ -499,9 +499,11 @@ function gotStream(stream) {
         audioMixStream = outputNode.stream;
         let micNode = audioContext.createMediaStreamSource(stream);
         micNode.connect(outputNode)
-        window.localStream.addTrack(audioMixStream.getAudioTracks()[0])
+        const audioTrack = audioMixStream.getAudioTracks()[0];
+        window.localStream.addTrack(audioTrack)
     } else {
-        window.localStream.addTrack(stream.getAudioTracks()[0])
+        const audioTrack = stream.getAudioTracks()[0];
+        window.localStream.addTrack(audioTrack)
     }
 }
 
