@@ -51,7 +51,7 @@ async function joinExisting(joinerBrowser, groupName, password) {
             .on('requestfailed', request =>
                 console.log(`${request.failure().errorText} ${request.url()}`))
     }
-    await joinerPage.goto('http://localhost/');
+    await joinerPage.goto('http://localhost');
     await joinerPage.click('aria/button[name="JOIN"]');
     await joinerPage.click('aria/textbox[name="Enter Room ID"]');
     await joinerPage.type('aria/textbox[name="Enter Room ID"]', groupName);
@@ -62,7 +62,7 @@ async function joinExisting(joinerBrowser, groupName, password) {
     });
     await joinerPage.click('aria/button[name="ENTER"]');
     await joinerPage.waitForNavigation();
-    await joinerPage.click('aria/button[name="Video"]');
+    //await joinerPage.click('aria/button[name="Video"]');
 
     return joinerPage;
 }
@@ -95,20 +95,21 @@ async function joinPreExistingRoom(groupName, password) {
         ]
     });
     let joinerPage = joinExisting(joinerBrowser, groupName, password)
-    await joinerPage.screenshot({path: 'test-dls/joinExisting.png'});
-    await joinerBrowser.close();
+    //await joinerPage.screenshot({path: 'test-dls/joinExisting.png'});
+    //await joinerBrowser.close();
 }
 
 async function joinPreExistingRoomAndHang(groupName, password) {
     const joinerBrowser = await puppeteer.launch({
         args: [
             '--use-fake-ui-for-media-stream',
-            '--use-fake-device-for-media-stream'
+            '--use-fake-device-for-media-stream',
+            'autoclose=False'
         ]
     });
     let joinerPage = joinExisting(joinerBrowser, groupName, password)
-    await joinerPage.screenshot({path: 'test-dls/joinExistingHang.png'});
-    await joinerBrowser.close();
+    //await joinerPage.screenshot({path: 'test-dls/joinExistingHang.png'});
+    // await joinerBrowser.close();
 }
 
 async function testCreateRoom(groupName, password) {
@@ -118,12 +119,16 @@ async function testCreateRoom(groupName, password) {
         ]
     });
     let page = await createNewRoom(browser, groupName, password);
-    await page.screenshot({path: 'test-dls/exampleGroup.png'});
+   // await page.screenshot({path: 'test-dls/exampleGroup.png'});
     await browser.close();
 }
 
+
+
 let logging = true;
-joinPreExistingRoomAndHang("Russia", "1234").then(r => console.log("blyat"));
+joinPreExistingRoomAndHang("Russia", "1234").then(r => {
+    console.log("blyat")
+});
 /*
 screenCapMainPage().then(r => console.log("screenCapMainPage test done"));
 testCreateRoom("Communism Carnival", "1234").then(r => console.log("testCreateRoom test done"));
