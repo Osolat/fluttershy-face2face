@@ -62,8 +62,7 @@ async function joinExisting(joinerBrowser, groupName, password) {
     });
     await joinerPage.click('aria/button[name="ENTER"]');
     await joinerPage.waitForNavigation();
-    await joinerPage.click('aria/button[name="Video"]');
-
+    console.log("Did this");
     return joinerPage;
 }
 
@@ -122,8 +121,8 @@ async function testCreateRoom(groupName, password) {
     await browser.close();
 }
 
-let logging = true;
-joinPreExistingRoomAndHang("Russia", "1234").then(r => console.log("blyat"));
+let logging = false;
+joinPreExistingRoom("Russia", "1234").then(r => console.log("blyat"));
 /*
 screenCapMainPage().then(r => console.log("screenCapMainPage test done"));
 testCreateRoom("Communism Carnival", "1234").then(r => console.log("testCreateRoom test done"));

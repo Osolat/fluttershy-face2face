@@ -27,6 +27,7 @@ mixerCanvasContext.fillStyle = 'rgb(128, 192, 128)';
 let tallestVid = 0;
 let widestVid = 0;
 let peerMixedStream = null;
+let mixerMixedStream = null;
 let animationId = null;
 
 // for audio
@@ -127,30 +128,60 @@ function sendMetaData() {
 // mixed video stream
 if (isMixingPeer) {
     peerMixedStream = canvasForPeers.captureStream(15);
-    animationId = window.requestAnimationFrame(drawCanvas)
+    mixerMixedStream = canvasForMixers.captureStream(15);
+    window.requestAnimationFrame(drawPeerCanvas)
+    //window.requestAnimationFrame(drawMixerCanvas)
 }
 
-function drawCanvas() {
-    drawPeerVideoStrip();
-    // animation frame will be drop down, when window is hidden.
-    animationId = window.requestAnimationFrame(drawCanvas);
-}
-
-function drawPeerVideoStrip() {
+function drawMixerVideoStrip() {
     let index = 1;
     const localVideo = document.getElementById("local-video");
-    drawVideoStripe(localVideo, 0, "-1");
+    drawVideoStripe(mixerCanvasContext, localVideo, 0, "-1");
     let remoteVid;
+    //console.log("Inside here mixer before loop")
     for (var key in RTCConnections) {
         remoteVid = document.getElementById(key);
         if (remoteVid && !mixingPeers.includes(key)) {
-            drawVideoStripe(remoteVid, index, key);
+            //console.log("Inside here mixer")
+            drawVideoStripe(mixerCanvasContext, remoteVid, index, key);
             index++;
         }
     }
 }
 
-function drawVideoStripe(videoElement, index, memberSocket) {
+function drawMixerCanvas() {
+    drawMixerVideoStrip();
+    // animation frame will be drop down, when window is hidden.
+    window.requestAnimationFrame(drawMixerVideoStrip);
+}
+
+function drawPeerCanvas() {
+    drawPeerVideoStrip();
+    // animation frame will be drop down, when window is hidden.
+    window.requestAnimationFrame(drawPeerCanvas);
+}
+
+function drawPeerVideoStrip() {
+    let indexInMixerCanvas = 1;
+    let indexInPeercanvas = 1;
+    const localVideo = document.getElementById("local-video");
+    drawVideoStripe(peerCanvasContext, localVideo, 0, "-1");
+    drawVideoStripe(mixerCanvasContext, localVideo, 0, "-1");
+    let remoteVid;
+    for (var key in RTCConnections) {
+        remoteVid = document.getElementById(key);
+        if (remoteVid && !mixingPeers.includes(key)) {
+            drawVideoStripe(mixerCanvasContext, remoteVid, indexInMixerCanvas, key);
+            indexInMixerCanvas++;
+        }
+        if (remoteVid) {
+            drawVideoStripe(peerCanvasContext, remoteVid, indexInPeercanvas, key);
+            indexInPeercanvas++;
+        }
+    }
+}
+
+function drawVideoStripe(c, videoElement, index, memberSocket, videoSlots) {
     let destLeft = canvasForPeers.width / (activeConnectionSize + 1) * index;
     let destTop = 0;
     if (videoElement.videoHeight > tallestVid) {
@@ -166,12 +197,12 @@ function drawVideoStripe(videoElement, index, memberSocket) {
     // fill horizontally
     var hRatio = (canvasForPeers.width / videoElement.videoWidth) * videoElement.videoHeight;
 
-    peerCanvasContext.drawImage(videoElement, destLeft, 0, canvasForPeers.width / (activeConnectionSize + 1), hRatio / (activeConnectionSize + 1));
+    c.drawImage(videoElement, destLeft, 0, canvasForPeers.width / (activeConnectionSize + 1), hRatio / (activeConnectionSize + 1));
     if (memberSocket === "-1") {
-        peerCanvasContext.fillText(nickName, destLeft + 2, destTop + 10);
+        c.fillText(nickName, destLeft + 2, destTop + 10);
 
     } else {
-        peerCanvasContext.fillText(RTCConnectionNames[memberSocket], destLeft + 2, destTop + 10);
+        c.fillText(RTCConnectionNames[memberSocket], destLeft + 2, destTop + 10);
     }
 }
 
@@ -195,6 +226,7 @@ function authenticateUser() {
     bootAndGetSocket().then(_ => {
         peerElectionPoints[socket.id] = 0;
         electionPointsReceived[socket.id] = false
+        if (isMixingPeer) mixingPeers.push(socket.id)
         tsync.send = function (id, data, _) {
             //console.log('send', id, data);
             //console.log(socket.id)
@@ -285,7 +317,6 @@ async function bootAndGetSocket() {
                 dataChannel.onmessage = onReceiveMessageCallback;
                 filetransfer.configureChannel(dataChannel)
                 dataChannels[data.socket] = dataChannel
-                console.log("Mixing peers array: " + mixingPeers)
                 dataChannels[data.socket].send(JSON.stringify({
                     type: "mixerStatus",
                     origin: socket.id,
@@ -366,13 +397,23 @@ function initNewRTCConnection(socketId) {
     activeConnectionSize++;
     RTCConnectionsCallStatus[socketId] = false;
     if (isMixingPeer) {
-        window.localStream.getTracks().forEach(track => {
-            if (track.kind === "video") {
-                console.log("Added video track to new rtc connection")
-                rtcConnection.addTrack(track, peerMixedStream);
-            }
-        });
-        rtcConnection.addTrack(outputNodes[socketId].stream.getAudioTracks()[0], peerMixedStream);
+        if (mixingPeers.includes(socketId)) {
+            mixerMixedStream.getTracks().forEach(track => {
+                if (track.kind === "video") {
+                    console.log("Added video track to new rtc connection")
+                    rtcConnection.addTrack(track, mixerMixedStream);
+                }
+            });
+            rtcConnection.addTrack(outputNodes[socketId].stream.getAudioTracks()[0], mixerMixedStream);
+        } else {
+            peerMixedStream.getTracks().forEach(track => {
+                if (track.kind === "video") {
+                    console.log("Added video track to new rtc connection")
+                    rtcConnection.addTrack(track, peerMixedStream);
+                }
+            });
+            rtcConnection.addTrack(outputNodes[socketId].stream.getAudioTracks()[0], peerMixedStream);
+        }
     } else if (mixingPeers.length === 0) {
         // If no mixing peers, we want to stream video to everyone
         window.localStream.getTracks().forEach(track => rtcConnection.addTrack(track, window.localStream));
@@ -380,10 +421,16 @@ function initNewRTCConnection(socketId) {
         // If there are mixing peers, we only want to stream video to the mixers
         window.localStream.getTracks().forEach(track => rtcConnection.addTrack(track, window.localStream));
     }
+    //Reset animation background
     peerCanvasContext.beginPath();
     peerCanvasContext.rect(0, 0, widestVid, tallestVid);
     peerCanvasContext.fillStyle = "black";
     peerCanvasContext.fill();
+
+    mixerCanvasContext.beginPath();
+    mixerCanvasContext.rect(0, 0, widestVid, tallestVid);
+    mixerCanvasContext.fillStyle = "black";
+    mixerCanvasContext.fill();
     // Some other init tied to the connection
     electionPointsReceived[socketId] = false;
 }
@@ -515,7 +562,6 @@ function gotStream(stream) {
     window.localStream = stream;
     audioContext.resume();
     if (isMixingPeer) {
-        window.localStream = peerMixedStream;
         outputNode = audioContext.createMediaStreamDestination();
         outputNodes[socket.id] = outputNode;
         audioMixStream = outputNode.stream;
@@ -538,8 +584,10 @@ async function benchMarkAllKnownPeers() {
 
 function becomeMixer() {
     peerMixedStream = canvasForPeers.captureStream(15);
-    animationId = window.requestAnimationFrame(drawCanvas)
+    mixerMixedStream = canvasForMixers.captureStream(15);
+    animationId = window.requestAnimationFrame(drawPeerCanvas)
     isMixingPeer = true;
+    mixingPeers.push(socket.id);
     const localVideo = document.getElementById("local-video");
     window.localStream = peerMixedStream;
     outputNode = audioContext.createMediaStreamDestination();
@@ -571,11 +619,18 @@ function becomeMixer() {
                 return s.track.kind === tracks[i].kind;
             });
             if (sender.track.kind === "audio") {
-                sender.replaceTrack(outputNodes[sock].stream).then(_ => "Replaced track");
+                sender.replaceTrack(outputNodes[sock].stream.getAudioTracks()[0]).then(_ => "Replaced track");
             } else {
                 sender.replaceTrack(tracks[i]).then(_ => "Replaced track");
             }
         }
+    }
+    for (const [sock, _] of Object.entries(dataChannels)) {
+        dataChannels[sock].send(JSON.stringify({
+            type: "mixerStatus",
+            origin: socket.id,
+            mixers: mixingPeers
+        }))
     }
 }
 
@@ -645,7 +700,65 @@ async function bitRateEveryone() {
     }
 }
 
+let networkSplit = {}
+
+function sendNetworkSplit() {
+    let message = {
+        type: "networkSplit",
+        origin: socket.id,
+        networkData: networkSplit
+    }
+    sendToAll(JSON.stringify(message));
+}
+
+async function pollMixerPerformance() {
+    if (!supremeMixerPeer) return;
+    let newSplitWanted = false
+    for (const [sock, _] of Object.entries(networkSplit)) {
+        if (networkSplit[sock].length > 3) newSplitWanted = true;
+    }
+    if (newSplitWanted) {
+        let quotient = Math.floor(roomConnectionsSet.size / mixingPeers.length)
+        let remainder = roomConnectionsSet.size % mixingPeers.length;
+        if ((quotient + remainder) > 3) {
+            // Can't possibly split network so each mixer has < 4 peers
+            let peersToDistribute = Object.keys(RTCConnections);
+            let newMixerFound = false;
+            let candidate;
+            while (!newMixerFound) {
+                let item = peersToDistribute[Math.floor(Math.random() * peersToDistribute.length)];
+                if (!mixingPeers.includes(item)) {
+                    candidate = item;
+                    newMixerFound = true;
+                }
+            }
+            mixingPeers.push(candidate);
+            quotient = Math.floor(roomConnectionsSet.size / mixingPeers.length)
+            remainder = roomConnectionsSet.size % mixingPeers.length;
+            for (const [sock, _] of Object.entries(networkSplit)) {
+                networkSplit[sock] = [];
+                for (let i = 0; i < quotient; i++) {
+                    networkSplit[sock].push(peersToDistribute.pop());
+                }
+                if (remainder > 0) {
+                    remainder--;
+                    networkSplit[sock].push(peersToDistribute.pop());
+                }
+            }
+            //TODO push out network status to all peers
+            sendNetworkSplit();
+            //TODO make them respond
+            //TODO make them pause to the appropriate mixers
+        } else {
+            // We simply need to redistribute
+            console.log("Should not be able to get down here - redistribute network")
+        }
+    }
+}
+
+let supremeMixerPeer = false;
 setInterval(bitRateEveryone, 1000 * 15);
+setInterval(pollMixerPerformance, 1000 * 30);
 
 function bitRateBenchMark(socketID) {
     if (!bitRates[socketID]) {
@@ -796,6 +909,8 @@ function electMixers(mixerSpots) {
     if (ranked[0][0] === socket.id) {
         console.log("I became mixer")
         mixingPeers.push(ranked[0][0])
+        supremeMixerPeer = true;
+        networkSplit[socket.id] = Array.from(roomConnectionsSet);
         becomeMixer();
     } else {
         mixingPeers.push(ranked[0][0])
@@ -833,6 +948,8 @@ function onReceiveMessageCallback(event) {
             break;
         case "chat":
             postChatMessage(data.message, data.nickname)
+            break;
+        case "networkSplit":
             break;
         case "file":
             if (timestampStart == -1) {
@@ -904,13 +1021,43 @@ function onReceiveMessageCallback(event) {
                 benchmarkBuffers[data.origin] = [];
             }
             break;
+        case "mixerStatusResponse":
+            data.mixers.forEach(newMixer => {
+                if (!mixingPeers.includes(newMixer)) {
+                    mixingPeers.push(newMixer)
+                    if (isMixingPeer) {
+                        var sender = RTCConnections[newMixer].getSenders().find(function (s) {
+                            return s.track.kind === "video";
+                        });
+                        sender.replaceTrack(mixerMixedStream.getVideoTracks()[0]).then(_ => "Replaced inside response");
+                    }
+                }
+            })
+            break;
         case "mixerStatus":
-            console.log("Here I am :" + data.mixers)
-            mixingPeers = data.mixers
+            data.mixers.forEach(newMixer => {
+                if (!mixingPeers.includes(newMixer)) {
+                    mixingPeers.push(newMixer)
+                    if (isMixingPeer) {
+                        var sender = RTCConnections[newMixer].getSenders().find(function (s) {
+                            return s.track.kind === "video";
+                        });
+                        sender.replaceTrack(mixerMixedStream.getVideoTracks()[0]).then(_ => "Replaced inside response");
+                    }
+                }
+            })
             if (mixingPeers.length !== 0) {
                 electionInitiated = true; //Election already held
-                pauseNonMixerStreams();
+                if (!isMixingPeer) {
+                    pauseNonMixerStreams();
+                }
             }
+            let response = {
+                type: "mixerStatusResponse",
+                origin: socket.id,
+                mixers: mixingPeers
+            }
+            dataChannels[data.origin].send(JSON.stringify(response))
             break;
         case "benchMarkResponse":
             console.log("Got a benchmark back from " + data.origin)
