@@ -51,7 +51,7 @@ let timestampStart = -1;
 
 let localVid = document.getElementById('local-video');
 localVid.addEventListener("click", () => {
-    becomeMixer();
+    bruteForceElectionInMyFavour();
 });
 const sendFileButton = document.querySelector('button#sendFile');
 sendFileButton.addEventListener('click', () => {
@@ -80,7 +80,11 @@ let benchmarkResponses = {};
 let peerElectionPoints = {};
 let electionInitiated = false;
 let electionNum = 0;
-const benchmarkSize = 1024 * 1024 * 4; // 4000kbytes = 4MB
+let debugging = true;
+//const benchmarkSize = 1024 * 1024 * 4; // 4000kbytes = 4MB
+//const benchmarkSize = 1024 * 1024; // 1000kbytes = 1MB
+const benchmarkSize = 1024 * 512; // 512kbytes = 0.5mb
+
 const benchmarkPackSize = 1024 * 8 // 8 Kbytes
 const benchmarkPacketNums = (benchmarkSize) / (benchmarkPackSize)
 console.log(benchmarkPacketNums)
@@ -89,7 +93,7 @@ console.log(benchmarkPacketNums)
 
 var tsync = timesync.create({
     peers: [], // start empty, will be updated at the start of every synchronization
-    interval: 5000,
+    interval: 10000,
     delay: 200,
     timeout: 1000
 });
@@ -634,6 +638,20 @@ function becomeMixer() {
     }
 }
 
+function bruteForceElectionInMyFavour() {
+    supremeMixerPeer = true;
+    electionInitiated = true;
+    electionBenchMarksSent = true;
+    networkSplit[socket.id] = Array.from(roomConnectionsSet);
+    becomeMixer();
+
+    let fascistOrder = {
+        type: "debugging",
+        origin: socket.id
+    }
+    sendToAll(JSON.stringify(fascistOrder));
+}
+
 let electionBenchMarksSent = false;
 
 async function evaluateElectionNeed(sock) {
@@ -694,6 +712,7 @@ async function forceElection() {
 }
 
 async function bitRateEveryone() {
+    if (debugging) return;
     for (const [sock, _] of Object.entries(RTCConnections)) {
         bitRateBenchMark(sock);
         await evaluateElectionNeed(sock);
@@ -712,17 +731,27 @@ function sendNetworkSplit() {
 }
 
 async function pollMixerPerformance() {
+    console.log("PollMixerPerformance")
     if (!supremeMixerPeer) return;
+    console.log("PollMixerPerformance: I am supreme")
+
     let newSplitWanted = false
     for (const [sock, _] of Object.entries(networkSplit)) {
-        if (networkSplit[sock].length > 3) newSplitWanted = true;
+        if (networkSplit[sock].length > 2) newSplitWanted = true;
     }
+    console.log("PollMixerPerformance: newsplitWanted =" + newSplitWanted)
+
     if (newSplitWanted) {
         let quotient = Math.floor(roomConnectionsSet.size / mixingPeers.length)
+        console.log("PollMixerPerformance: quotient = " + quotient)
+
         let remainder = roomConnectionsSet.size % mixingPeers.length;
-        if ((quotient + remainder) > 3) {
-            // Can't possibly split network so each mixer has < 4 peers
+        console.log("PollMixerPerformance: remainder = " + remainder)
+
+        if ((quotient + remainder) > 2) {
+            // Can't possibly split network so each mixer has < 3 peers
             let peersToDistribute = Object.keys(RTCConnections);
+            console.log("PollMixerPerformance: peersToDistribute = " + peersToDistribute)
             let newMixerFound = false;
             let candidate;
             while (!newMixerFound) {
@@ -733,8 +762,13 @@ async function pollMixerPerformance() {
                 }
             }
             mixingPeers.push(candidate);
-            quotient = Math.floor(roomConnectionsSet.size / mixingPeers.length)
-            remainder = roomConnectionsSet.size % mixingPeers.length;
+            networkSplit[candidate] = [];
+            console.log("PollMixerPerformance: mixingPeers = " + mixingPeers);
+            console.log("PollMixerPerformance: peersToDistribute = " + peersToDistribute);
+            peersToDistribute = peersToDistribute.filter(elem => elem !== candidate);
+            console.log("PollMixerPerformance: peersToDistribute = " + peersToDistribute);
+            quotient = Math.floor(peersToDistribute.length / mixingPeers.length)
+            remainder = peersToDistribute.length % mixingPeers.length;
             for (const [sock, _] of Object.entries(networkSplit)) {
                 networkSplit[sock] = [];
                 for (let i = 0; i < quotient; i++) {
@@ -909,6 +943,8 @@ function electMixers(mixerSpots) {
     if (ranked[0][0] === socket.id) {
         console.log("I became mixer")
         mixingPeers.push(ranked[0][0])
+        // We should only have one mixer at this point.
+        console.assert(mixingPeers.length === 1)
         supremeMixerPeer = true;
         networkSplit[socket.id] = Array.from(roomConnectionsSet);
         becomeMixer();
@@ -930,11 +966,49 @@ function electMixersIfValid() {
     electMixers(1);
 }
 
+function handleTurningNonMixer() {
+    isMixingPeer = false;
+}
+
+function rebootStreamTargets() {
+    if (!isMixingPeer) {
+        //I am a regular client, and I should only stream video/audio to the mixer
+        let myMixer;
+        for (const [sock, arr] of Object.entries(networkSplit)) {
+            if (arr.includes(socket.id)) {
+                myMixer = sock;
+                //Send actual video to mixer
+                let tracks = window.localStream.getTracks();
+                let senders = RTCConnections[sock].getSenders();
+                for (let i = 0; i < senders.length; i++) {
+                    console.assert(senders[i].track.kind === tracks[i].kind)
+                    senders[i].replaceTrack(tracks[i]).then(_ => console.log("Restarted a track"))
+                }
+            }
+        }
+        console.assert(myMixer !== undefined);
+        for (const [sock, _] of Object.entries(RTCConnections)) {
+            if (sock !== myMixer) {
+                let senders = RTCConnections[sock].getSenders();
+                for (let i = 0; i < senders.length; i++) {
+                    senders[i].replaceTrack(null).then(_ => console.log("Stopped a track"))
+                }
+            }
+        }
+    }
+}
+
 function onReceiveMessageCallback(event) {
     // console.log(`Received Message ${event.data}`);
     let data = JSON.parse(event.data)
     let replyChannel = event.target;
     switch (data.type) {
+        case "debugging":
+            electionInitiated = true;
+            electionBenchMarksSent = true;
+            mixingPeers = [data.origin]
+            pauseNonMixerStreams();
+            break;
         case "electionPoints":
             for (const [id, votes] of Object.entries(data.points)) {
                 if (!peerElectionPoints.hasOwnProperty(id)) {
@@ -950,6 +1024,28 @@ function onReceiveMessageCallback(event) {
             postChatMessage(data.message, data.nickname)
             break;
         case "networkSplit":
+            console.log("In networkSplit")
+            console.log(data.networkData);
+            for (const [id, _] of Object.entries(data.networkData)) {
+                console.log(data.networkData[id])
+            }
+            networkSplit = data.networkData;
+            let newMixers = Object.keys(networkSplit);
+            mixingPeers = newMixers;
+            let clientInMixerChoices = mixingPeers.includes(socket.id);
+            if (isMixingPeer && !clientInMixerChoices) {
+                console.log("Turn nonmixer")
+
+                handleTurningNonMixer();
+            } else if (!isMixingPeer && clientInMixerChoices) {
+                console.log("Turn mixer from networkSplit update")
+                becomeMixer();
+            } else if (!isMixingPeer && !clientInMixerChoices) {
+                //My status didn't change, but the mixer I should stream to might
+                console.log("rebootStreamTargets")
+
+                rebootStreamTargets();
+            }
             break;
         case "file":
             if (timestampStart == -1) {
