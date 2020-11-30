@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="https://cdn.anychart.com/releases/8.8.0/js/anychart-core.min.js"></script>
+    <script src="https://cdn.anychart.com/releases/8.8.0/js/anychart-graph.min.js"></script>
+    <script src="https://cdn.anychart.com/releases/8.8.0/js/anychart-data-adapter.min.js"></script>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
@@ -11,7 +14,6 @@
     />
     <link rel="stylesheet" href="./stylesheets/style.css"/>
     <script src="./javascripts/room.js" type="module"></script>
-    <script src="./javascripts/bundle.js"></script>
     <script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js"></script>
 </head>
@@ -48,7 +50,7 @@
                         onclick="this.parentElement.style.display='none'" class="topright">&times</span></button>
                 <button class="tablink" onclick="openPage('HomeworkTODO', this, '#65A9E5')">Homework/TODO <span
                         onclick="this.parentElement.style.display='none'" class="topright">&times</span></button>
-                <button class="tablink" onclick="openPage('Settings', this, '#65A9E5')">Settings <span
+                <button class="tablink" onclick="openPage('NetworkTab', this, '#65A9E5')">Network <span
                         onclick="this.parentElement.style.display='none'" class="topright">&times</span></button>
                 <button class="tabCreate" id="new" onclick="createButton()">+</button>
             </div>
@@ -104,9 +106,39 @@
                     </ul>
                 </div>
 
-                <div id="Settings" class="tabcontent" style="overflow: scroll;">
-                    <h3>Setting</h3>
-                    <p>Who we are and what we do.</p>
+                <div id="NetworkTab" class="tabcontent">
+                    <h3>Network</h3>
+                    <div id="container" class="plot"></div>
+                    <script>
+                        var data = {
+                            nodes: [
+                                {id: "me"}
+                            ],
+                            edges: [
+                                {from: "me", to: "me"}
+                            ]
+                            };
+
+                            // create a chart and set the data
+                            var chart = anychart.graph(data);
+
+                            chart.title("Network Graph showing all peers");
+                            // draw the chart
+
+                            // enable the labels of nodes
+                            chart.nodes().labels().enabled(true);
+
+                            // configure the labels of nodes
+                            chart.nodes().labels().format("{%id}");
+                            chart.nodes().labels().fontSize(12);
+                            chart.nodes().labels().fontWeight(600);
+
+                            // set the container id
+                            chart.container("container");
+
+                            // initiate drawing the chart
+                            chart.draw();
+                    </script>
                 </div>
             </div>
             <div class="context-container">
@@ -137,7 +169,11 @@
     <button disabled id="sendFile">Send</button>
     <button disabled id="abortButton">Abort</button>
 </div>
+
 <script>
+    
+
+
     function openPage(pageName, elmnt, color) {
         var i, tabcontent, tablinks;
         tabcontent = document.getElementsByClassName("tabcontent");
@@ -170,7 +206,7 @@
         newTabBut.className = 'tablink'
         newTabBut.id = uniqid
         newTabBut.onclick = function () {
-            openPage('Settings', this, '#65A9E5')
+            openPage('HomeworkTODO', this, '#65A9E5')
         };
 
         newTabBut.innerHTML = "NewTab <span onclick='closePage(this.parentElement.id)' class='topright'> × </span>"

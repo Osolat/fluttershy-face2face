@@ -143,7 +143,7 @@ body {
 .room-header {
     position: absolute;
     top: 40%;
-    left: 35%;
+    left: 47%;
     color: #65A9E5;
     font-weight: bold;
 }
@@ -237,7 +237,7 @@ body {
   }
 
 .tabBar {
-    height: 5%;
+    height: 50px;
     width: 100%;
     max-width: 100%;
     position: relative;
@@ -256,7 +256,7 @@ body {
 #VideoTab {background-color: #65A9E5;}
 #Document {background-color: white;}
 #HomeworkTODO {background-color: white;}
-#Settings {background-color: white;}
+#NetworkTab {background-color: white;}
 
 .tabcontent {
     color: black;
@@ -264,4 +264,11 @@ body {
     padding: 5px 20px;
     height: 98%;
     white-space: initial
+  }
+
+  .plot {
+    width: 100%;
+    height: 70%;
+    margin: 0;
+    padding: 0;
   }
