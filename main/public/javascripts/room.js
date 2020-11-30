@@ -90,6 +90,7 @@ let benchmarkResponses = {};
 let peerElectionPoints = {};
 let electionInitiated = false;
 let electionNum = 0;
+let allowedSubNetworkSize = 2;
 let debugging = true;
 //const benchmarkSize = 1024 * 1024 * 4; // 4000kbytes = 4MB
 //const benchmarkSize = 1024 * 1024; // 1000kbytes = 1MB
@@ -774,7 +775,7 @@ async function pollMixerPerformance() {
 
     let newSplitWanted = false
     for (const [sock, _] of Object.entries(networkSplit)) {
-        if (networkSplit[sock].length > 2) newSplitWanted = true;
+        if (networkSplit[sock].length > allowedSubNetworkSize) newSplitWanted = true;
     }
     console.log("PollMixerPerformance: newsplitWanted =" + newSplitWanted)
 
@@ -785,7 +786,7 @@ async function pollMixerPerformance() {
         let remainder = roomConnectionsSet.size % mixingPeers.length;
         console.log("PollMixerPerformance: remainder = " + remainder)
 
-        if ((quotient + remainder) > 2) {
+        if ((quotient + remainder) > allowedSubNetworkSize) {
             // Can't possibly split network so each mixer has < 3 peers
             let peersToDistribute = Object.keys(RTCConnections);
             console.log("PollMixerPerformance: peersToDistribute = " + peersToDistribute)
