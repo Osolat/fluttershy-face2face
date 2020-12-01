@@ -803,6 +803,7 @@ async function pollMixerPerformance() {
         if ((quotient + remainder) > allowedSubNetworkSize) {
             // Can't possibly split network so each mixer has < 3 peers
             let peersToDistribute = Object.keys(RTCConnections);
+            peersToDistribute = peersToDistribute.filter(elem => !mixingPeers.includes(elem));
             console.log("PollMixerPerformance: peersToDistribute = " + peersToDistribute)
             let newMixerFound = false;
             let candidate;
@@ -815,15 +816,9 @@ async function pollMixerPerformance() {
             }
             mixingPeers.push(candidate);
             networkSplit[candidate] = [];
-            const index = peersToDistribute.indexOf(candidate);
-            if (index > -1) {
-                peersToDistribute.splice(index, 1);
-            } else {
-                console.log("Major failure, could not remove new mixer from peersToDistribute")
-            }
             console.log("PollMixerPerformance: mixingPeers = " + mixingPeers);
             console.log("PollMixerPerformance: peersToDistribute = " + peersToDistribute);
-            peersToDistribute = peersToDistribute.filter(elem => elem !== candidate);
+            peersToDistribute = peersToDistribute.filter(elem => (elem !== candidate));
             console.log("PollMixerPerformance: peersToDistribute = " + peersToDistribute);
             quotient = Math.floor(peersToDistribute.length / mixingPeers.length)
             remainder = peersToDistribute.length % mixingPeers.length;
