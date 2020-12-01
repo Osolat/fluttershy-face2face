@@ -312,7 +312,6 @@ async function bootAndGetSocket() {
                 console.log(networkSplit)
                 pollMixerPerformance();
                 sendNetworkSplit();
-
             }
             roomConnectionsSet.delete(socketId);
             elToRemove.remove();
