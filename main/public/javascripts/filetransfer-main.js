@@ -3,6 +3,10 @@ export {
     onSendChannelStateChange,
     receiveChannelCallback,
     configureChannel,
+    fileEmpty,
+    sendData,
+    makeDownloadLink,
+    byteCount
 }
 
 'use strict';
@@ -18,6 +22,7 @@ const sendProgress = document.querySelector('progress#sendProgress');
 const receiveProgress = document.querySelector('progress#receiveProgress');
 const statusMessage = document.querySelector('span#status');
 const sendFileButton = document.querySelector('button#sendFile');
+
 
 let receiveBuffer = [];
 let receivedSize = 0;
@@ -38,8 +43,10 @@ abortButton.addEventListener('click', () => {
 });
 
 
-async function handleFileInputChange() {
-    const file = fileInput.files[0];
+
+
+async function handleFileInputChange(event) {
+    const file = fileInput.files[0]
     if (!file) {
         console.log('No file chosen');
     } else {
@@ -73,19 +80,47 @@ async function configureChannel(dataChannel) {
     dataChannel.addEventListener('error', error => console.error('Error in sendChannel:', error));
 }
 
-function sendData() {
+
+
+function encode(buf) {
+    return String.fromCharCode.apply(null, new Uint8Array(buf));
+}
+
+function makeDownloadLink(received, metadata, sender) {
+    //downloadAnchor.href = URL.createObjectURL(received)
+    //downloadAnchor.download = metadata.name;
+    //downloadAnchor.textContent =
+    //    `Click to download '${metadata.name}' (${metadata.size} bytes)`;
+    //downloadAnchor.style.display = 'block';
+    var ts = Date.now();
+    var h = new Date(ts).getHours();
+    var m = new Date(ts).getMinutes();
+    var s = new Date(ts).getSeconds();
+    h = (h < 10) ? '0' + h : h;
+    m = (m < 10) ? '0' + m : m;
+    s = (s < 10) ? '0' + s : s;
+    var formattedTime = h + ':' + m + ':' + s + "  ";
+    const chatEntryItem = document.createElement("li");
+    chatEntryItem.innerHTML = '<p class="timestamp-chat">' + formattedTime + '(' + sender + ') ' +
+        '<a href='+ URL.createObjectURL(received) + ' download='+ metadata.name + '>'+'<span class="chat-message">' + metadata.name + '</span>' + '</a>' + '</p>'
+    console.log(chatEntryItem.innerHTML)
+    const chatloglist = document.getElementById("chat-log-list");
+    if (chatloglist) {
+        chatloglist.appendChild(chatEntryItem);
+    }
+}
+
+function byteCount(s) {
+    return encodeURI(s).split(/%..|./).length - 1;
+}
+function sendData(sendChannels, hash, sender) {
     const file = fileInput.files[0];
     console.log(`File is ${[file.name, file.size, file.type, file.lastModified].join(' ')}`);
-
+    let fileBuffer = []
+    let bufferSize = 0;
     // Handle 0 size files.
     statusMessage.textContent = '';
     downloadAnchor.textContent = '';
-    if (file.size === 0) {
-        bitrateDiv.innerHTML = '';
-        statusMessage.textContent = 'File is empty, please select a non-empty file';
-        closeDataChannels();
-        return;
-    }
     sendProgress.max = file.size;
     receiveProgress.max = file.size;
     const chunkSize = 16384;
@@ -94,20 +129,51 @@ function sendData() {
     fileReader.addEventListener('error', error => console.error('Error reading file:', error));
     fileReader.addEventListener('abort', event => console.log('File reading aborted:', event));
     fileReader.addEventListener('load', e => {
-        console.log('FileRead.onload ', e);
-        sendChannel.send(e.target.result);
-        offset += e.target.result.byteLength;
-        sendProgress.value = offset;
-        if (offset < file.size) {
-            readSlice(offset);
+            console.log('FileRead.onload ', e);
+            let buffer = e.target.result;
+            let chunkView = new Uint8Array(buffer);
+            console.log(chunkView);
+            fileBuffer.push(chunkView);
+            let strCode = encode(chunkView);
+            console.log(strCode);
+            let JSONdata = JSON.stringify({
+                type: "file",
+                hash: hash,
+                payload: strCode
+            })
+            for (const [_, dc] of Object.entries(sendChannels)) {
+                dc.send(JSONdata)
+            };
+            offset += buffer.byteLength;
+            sendProgress.value = offset;
+            if (offset < file.size) {
+                readSlice(offset);
+            } else {
+                let metadata = {}
+                metadata.name = file.name;
+                metadata.size = file.size;
+                metadata.type = file.type;
+                let blob = new Blob(fileBuffer)
+                console.log(blob)
+                makeDownloadLink(blob, metadata, sender)
+            }
         }
-    });
+    );
     const readSlice = o => {
         console.log('readSlice ', o);
         const slice = file.slice(offset, o + chunkSize);
         fileReader.readAsArrayBuffer(slice);
     };
     readSlice(0);
+}
+function fileEmpty() {
+  const file = fileInput.files[0];
+  if (file.size === 0) {
+    bitrateDiv.innerHTML = '';
+    statusMessage.textContent = 'File is empty, please select a non-empty file';
+    return true;
+  }
+  return false
 }
 
 function closeDataChannels() {

@@ -40,7 +40,7 @@ document.write('\
         </div> \
         \
         <div id="bitrate"></div> \
-        <a id="download"></a> \
+        <a id="download" ></a> \
         <span id="status"></span> \
         \
         </section> \

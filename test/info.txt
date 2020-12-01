@@ -1,0 +1,16 @@
+#Info for using test tools
+
+#Build puppeteer dockerfile
+docker build -t puppeteer-chrome-linux -f puppet-chrome.Dockerfile .
+
+#Run a docker container containing "tests.js"
+docker run -i --init --rm --cap-add=SYS_ADMIN  --network="host"  --name puppet puppeteer-chrome-linux    node -e "`cat tests.js`" --unhandled-rejections=strict
+
+#Kill all docker containers with name starting with "puppet" (require pumba)
+docker run -it --rm  -v /var/run/docker.sock:/var/run/docker.sock pumba kill re2:^puppet
+
+
+#Run 5 docker containters containing "tests.js" in the background. console output for puppet i will be logged in puppet-i-log
+for i in `seq 1 5`; \
+do (docker run -i --init --rm --cap-add=SYS_ADMIN  --network="host"  --name puppet_$i puppeteer-chrome-linux    node -e "`cat tests.js`" --unhandled-rejections=strict > test-logs/puppet-$i-log &)  ; \
+done

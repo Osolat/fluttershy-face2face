@@ -11,12 +11,29 @@ textInput.on("keypress", function (event) {
 });
 
 //For mixing
-let canvasMix = document.getElementById('mix-canvas');
-let ctxMix = canvasMix.getContext('2d');
+// let canvasForPeers = document.getElementById('mix-canvas');
+let canvasForPeers = document.createElement('canvas');
+canvasForPeers.width = 500;
+canvasForPeers.height = 400;
+let peerCanvasContext = canvasForPeers.getContext('2d');
+peerCanvasContext.fillStyle = 'rgb(128, 192, 128)';
+
+let canvasForMixers = document.createElement('canvas');
+canvasForMixers.width = 500;
+canvasForMixers.height = 400;
+let mixerCanvasContext = canvasForMixers.getContext('2d');
+mixerCanvasContext.fillStyle = 'rgb(128, 192, 128)';
+
+let dummmyCanvas = document.createElement('canvas');
+dummmyCanvas.width = 1;
+dummmyCanvas.height = 1;
+let dummyContext = dummmyCanvas.getContext('2d');
+dummyContext.fillStyle = 'rgb(128, 192, 128)';
+
 let tallestVid = 0;
 let widestVid = 0;
-ctxMix.fillStyle = 'rgb(128, 192, 128)';
-let mixStream = null;
+let peerMixedStream = null;
+let mixerMixedStream = null;
 let animationId = null;
 let mixingPeerCollection = new Set();
 //mixingPeerCollection.add("34kg3h5ghj2gdywtquyd34")
@@ -25,24 +42,26 @@ let mixingPeerCollection = new Set();
 
 // for audio
 let audioContext = new window.AudioContext();
+audioContext.resume();
+let dummyAudioStream = audioContext.createMediaStreamDestination().stream;
+let dummyVideoStream = dummmyCanvas.captureStream();
+
 let micNodes = [];
 let outputNodes = [];
+let outputNode;
+let audioMixStream;
 let audioMixStreams = [];
 
 
 // for filetransfer
-let receiveBuffer = [];
-let receivedSize = 0;
+let peersReady = {};
+let receiveBuffers = {};
+let filemetadata = {};
 let statsInterval = null;
+let timestampStart = -1;
 
 
 //Variables for network etc
-/*const popUpBut = document.querySelector('button#audio-popup-button');
-popUpBut.addEventListener('click', () => {
-    var modal = document.getElementById("audioPopup");
-    audioContext = new window.AudioContext();
-    modal.style.display = "none";
-})*/
 
 //connectionOutgoing = {}
 //connectionOutgoing[id_1] = {id_1, id_2, id_3}
@@ -51,9 +70,15 @@ networkButton.addEventListener('click', () => {
     populateNetwork()
 })
 
+let localVid = document.getElementById('local-video');
+localVid.addEventListener("click", () => {
+    bruteForceElectionInMyFavour();
+});
 const sendFileButton = document.querySelector('button#sendFile');
 sendFileButton.addEventListener('click', () => {
-    console.log(dataChannels)
+    if (!filetransfer.fileEmpty()) {
+        sendMetaData()
+    }
 })
 
 //Update the network graph by calling populateNetwork over and over after 3000 milliseconds
@@ -68,10 +93,69 @@ var roomConnectionsSet = new Set();
 var activeConnectionSize = 0;
 let RTCConnectionNames = {};
 var isMixingPeer = false;
-var useNetWorkSplit = true
+//var useNetWorkSplit = true
+let electionPointsReceived = {}
+let nonMixerStreamsPaused = false;
+let mixingPeers = [];
 let socket;
 let roomID;
 let nickName = "Anonymous";
+let bitRates = {};
+let frameEncodeTimes = {};
+let benchmarkBuffers = {};
+let benchmarkResponses = {};
+let peerElectionPoints = {};
+let electionInitiated = false;
+let electionNum = 0;
+let allowedSubNetworkSize = 2;
+let debugging = true;
+//const benchmarkSize = 1024 * 1024 * 4; // 4000kbytes = 4MB
+//const benchmarkSize = 1024 * 1024; // 1000kbytes = 1MB
+const benchmarkSize = 1024 * 512; // 512kbytes = 0.5mb
+
+const benchmarkPackSize = 1024 * 8 // 8 Kbytes
+const benchmarkPacketNums = (benchmarkSize) / (benchmarkPackSize)
+console.log(benchmarkPacketNums)
+
+// for timesync
+
+var tsync = timesync.create({
+    peers: [], // start empty, will be updated at the start of every synchronization
+    interval: 10000,
+    delay: 200,
+    timeout: 1000
+});
+
+
+function hashCode(string) {
+    var hash = 0, i, chr;
+    for (i = 0; i < string.length; i++) {
+        chr = string.charCodeAt(i);
+        hash = ((hash << 5) - hash) + chr;
+        hash |= 0; // Convert to 32bit integer
+    }
+    return hash;
+}
+
+function sendMetaData() {
+    let file = fileInput.files[0];
+    console.log(file);
+    file.text().then(
+        (v) => {
+            let hash = hashCode(v)
+            peersReady[hash] = 0;
+            console.log(hash)
+            let JSONdata = JSON.stringify({
+                type: "file-metadata",
+                name: file.name,
+                size: file.size,
+                filetype: file.type,
+                hash: hash
+            })
+            sendToAll(JSONdata)
+        }
+    )
+}
 
 //Determines the group of each peer.
 var group = ""
@@ -90,46 +174,72 @@ var netGraphTopologyData = {
 
 }
 
-var networkSplit = {
-    id1: ["p1", "p2", "p3", "p4"],                                      //1st group
-    id2: [],                                                  //2nd group
-    id3: []                                                       //mixers
-}
+// var testNetworkSplit = {
+//     id1: ["p1", "p2", "p3", "p4"],                                      //1st group
+//     id2: [],                                                  //2nd group
+//     id3: []                                                       //mixers
+// }
 
 // mixed video stream
 if (isMixingPeer) {
-    mixStream = canvasMix.captureStream(15);
-    animationId = window.requestAnimationFrame(drawCanvas)
+    peerMixedStream = canvasForPeers.captureStream(15);
+    mixerMixedStream = canvasForMixers.captureStream(15);
+    window.requestAnimationFrame(drawPeerCanvas)
+    //window.requestAnimationFrame(drawMixerCanvas)
 }
 
-function drawCanvas() {
-    drawCanvasStripe();
-    // animation frame will be drop down, when window is hidden.
-    animationId = window.requestAnimationFrame(drawCanvas);
-}
-
-function drawCanvasStripe() {
+function drawMixerVideoStrip() {
     let index = 1;
     const localVideo = document.getElementById("local-video");
-    drawVideoStripe(localVideo, 0, "-1");
+    drawVideoStripe(mixerCanvasContext, localVideo, 0, "-1");
     let remoteVid;
+    //console.log("Inside here mixer before loop")
     for (var key in RTCConnections) {
         remoteVid = document.getElementById(key);
-        if (remoteVid) {
-            drawVideoStripe(remoteVid, index, key);
+        if (remoteVid && !mixingPeers.includes(key)) {
+            //console.log("Inside here mixer")
+            drawVideoStripe(mixerCanvasContext, remoteVid, index, key);
             index++;
         }
     }
 }
 
-function drawVideoStripe(videoElement, index, memberSocket) {
-    /*let srcLeft = videoElement.videoWidth * (3.0 / 8.0);
-    let srcTop = 0;
-    let srcWidth = videoElement.videoWidth;
-    let srcHeight = videoElement.videoHeight;
-    let destWidth = mixWidth / (activeConnectionSize + 1);
-    let destHeight = mixHeight / (activeConnectionSize + 1);*/
-    let destLeft = canvasMix.width / (activeConnectionSize + 1) * index;
+function drawMixerCanvas() {
+    drawMixerVideoStrip();
+    // animation frame will be drop down, when window is hidden.
+    window.requestAnimationFrame(drawMixerVideoStrip);
+}
+
+function drawPeerCanvas() {
+    drawPeerVideoStrip();
+    // animation frame will be drop down, when window is hidden.
+    window.requestAnimationFrame(drawPeerCanvas);
+}
+
+function drawPeerVideoStrip() {
+    let indexInMixerCanvas = 1;
+    let indexInPeercanvas = 1;
+    resetCanvases();
+    const localVideo = document.getElementById("local-video");
+    let remoteVid;
+    let videoslots = networkSplit[socket.id].length;
+    drawVideoStripe(peerCanvasContext, localVideo, 0, "-1", videoslots + mixingPeers.length);
+    drawVideoStripe(mixerCanvasContext, localVideo, 0, "-1", videoslots);
+    for (var key in RTCConnections) {
+        remoteVid = document.getElementById(key);
+        if (remoteVid && !mixingPeers.includes(key) && networkSplit[socket.id].includes(key)) {
+            drawVideoStripe(mixerCanvasContext, remoteVid, indexInMixerCanvas, key, videoslots);
+            indexInMixerCanvas++;
+        }
+        if (remoteVid && networkSplit[socket.id].includes(key)) {
+            drawVideoStripe(peerCanvasContext, remoteVid, indexInPeercanvas, key, videoslots + mixingPeers.length);
+            indexInPeercanvas++;
+        }
+    }
+}
+
+function drawVideoStripe(c, videoElement, index, memberSocket, videoSlots) {
+    let destLeft = canvasForPeers.width / (videoSlots + 1) * index;
     let destTop = 0;
     if (videoElement.videoHeight > tallestVid) {
         tallestVid = videoElement.videoHeight;
@@ -139,23 +249,22 @@ function drawVideoStripe(videoElement, index, memberSocket) {
     }
 
     /*
-        ctxMix.drawImage(videoElement, destLeft, destTop, destWidth, destHeight);
+        peerCanvasContext.drawImage(videoElement, destLeft, destTop, destWidth, destHeight);
     */
     // fill horizontally
-    var hRatio = (canvasMix.width / videoElement.videoWidth) * videoElement.videoHeight;
-
-    ctxMix.drawImage(videoElement, destLeft, 0, canvasMix.width / (activeConnectionSize + 1), hRatio / (activeConnectionSize + 1));
+    var hRatio = (canvasForPeers.width / videoElement.videoWidth) * videoElement.videoHeight;
+    c.drawImage(videoElement, destLeft, 0, canvasForPeers.width / (videoSlots + 1), hRatio / (videoSlots + 1));
     if (memberSocket === "-1") {
-        ctxMix.fillText(nickName, destLeft + 2, destTop + 10);
-
+        c.fillText(nickName, destLeft + 2, destTop + 10);
     } else {
-        ctxMix.fillText(RTCConnectionNames[memberSocket], destLeft + 2, destTop + 10);
+        //TODO uncomment this
+        //c.fillText(RTCConnectionNames[memberSocket], destLeft + 2, destTop + 10);
+        c.fillText(memberSocket, destLeft + 2, destTop + 10);
     }
-
 }
 
 function authenticateUser() {
-    var cook = document.cookie;
+    let cook = document.cookie;
     if (!cook) {
         window.location.replace("..");
     }
@@ -165,21 +274,52 @@ function authenticateUser() {
             roomID = splitAroundEq[1].trim();
         }
         if (splitAroundEq[0].trim() === "name") {
-            nickName = splitAroundEq[1].trim();
+            //TODO uncomment this
+            //nickName = splitAroundEq[1].trim();
         }
     }
     const header = document.getElementById("room-header-id");
     header.innerHTML = decodeURI(roomID);
-    socket = io.connect(window.location.hostname, { query: { "group-id": roomID } });
-    bootAndGetSocket().then(r => console.log("Setup finished"));
+    socket = io.connect(window.location.hostname, {query: {"group-id": roomID}});
+    bootAndGetSocket().then(_ => {
+        peerElectionPoints[socket.id] = 0;
+        electionPointsReceived[socket.id] = false
+        if (isMixingPeer) mixingPeers.push(socket.id)
+        tsync.send = function (id, data, _) {
+            //console.log('send', id, data);
+            //console.log(socket.id)
+            let packetString = JSON.stringify({
+                type: "timesync",
+                from: socket.id,
+                tsdata: data,
+            })
+            let channel = dataChannels[id];
+            if (channel) {
+                channel.send(packetString);
+            } else {
+                console.log(new Error('Cannot send message: not connected to ' + id).toString());
+            }
+            return Promise.resolve();
+        }
+        tsync.on('sync', function (state) {
+            //console.log("sync " + state)
+            if (state == "start") {
+                tsync.options.peers = Object.keys(dataChannels)
+            }
+        });
+        console.log("Setup finished");
+        console.log("My id is: " + socket.id)
+    });
 }
 
+let d = new Date();
+console.log(d.getTime())
 authenticateUser();
 
 async function bootAndGetSocket() {
     await initLocalStream();
     // TODO: Handle different room IDs.
-    socket.on('connect', (socket) => {
+    socket.on('connect', (_) => {
         console.log("Connected to discovery server through socket.");
     })
 
@@ -190,20 +330,18 @@ async function bootAndGetSocket() {
 
     socket.on("latest-names", (goym) => {
         RTCConnectionNames = JSON.parse(goym);
-        for (const property in RTCConnections) {
-            console.log(`${property}: ${RTCConnectionNames[property]}`);
-        }
     });
 
     socket.on("remove-user", ({ socketId }) => {
         const elToRemove = document.getElementById(socketId);
         if (elToRemove) {
             delete RTCConnections[socketId];
+            delete electionPointsReceived[socketId];
             activeConnectionSize--;
             delete RTCConnectionsCallStatus[socketId];
             delete RTCConnectionNames[socketId];
             roomConnectionsSet.delete(socketId);
-            mixingPeerCollection.delete(socketId)                                   //When a mixing peer leave, delete it from the mixingPeerCollection
+            mixingPeers.pop()                                   //When a mixing peer leave, delete it from the mixingPeerCollection
             updateOnRemove(roomConnectionsSet)                                      //Update graph according to the deletion of nodes
             elToRemove.remove();
         }
@@ -218,7 +356,6 @@ async function bootAndGetSocket() {
             let newChannel = filetransfer.createChannel(RTCConnections[data.socket])
             newChannel.onmessage = onReceiveMessageCallback
             dataChannels[data.socket] = newChannel;
-            console.log(dataChannels)
         }
         if (!RTCConnectionsCallStatus[data.socket]) {
             callUser(data.socket);
@@ -241,8 +378,12 @@ async function bootAndGetSocket() {
                 dataChannel.onmessage = onReceiveMessageCallback;
                 filetransfer.configureChannel(dataChannel)
                 dataChannels[data.socket] = dataChannel
+                dataChannels[data.socket].send(JSON.stringify({
+                    type: "mixerStatus",
+                    origin: socket.id,
+                    mixers: mixingPeers
+                }))
             }
-            console.log(dataChannels)
         })
         RTCConnections[data.socket].ondatachannel = (event) => {
             if (!dataChannels[data.socket]) {
@@ -250,8 +391,13 @@ async function bootAndGetSocket() {
                 dataChannel.onmessage = onReceiveMessageCallback;
                 filetransfer.configureChannel(dataChannel)
                 dataChannels[data.socket] = dataChannel
+                console.log("Mixing peers array: " + mixingPeers)
+                dataChannels[data.socket].send(JSON.stringify({
+                    type: "mixerStatus",
+                    origin: socket.id,
+                    mixers: mixingPeers
+                }))
             }
-            console.log(dataChannels)
         }
         socket.emit("make-answer", {
             answer,
@@ -278,40 +424,68 @@ function gotRemoteStream(rtcTrackEvent, userId) {
     }
 }
 
-function initNewRTCConnection(socketId) {
-    let rtcConnection = new RTCPeerConnection();
-    rtcConnection.ontrack = function ({ streams: [stream] }) {
+
+function getOntrackFunction(socketId) {
+    return function ({streams: [stream]}) {
         const remoteVideo = document.getElementById(socketId);
         if (remoteVideo) {
             remoteVideo.srcObject = stream;
-            if (isMixingPeer) remoteVideo.volume = 0;
         }
-        let micNode = audioContext.createMediaStreamSource(stream);
-        micNodes[socketId] = micNode;
-        for (let key in outputNodes) {
-            console.log("Iterate output nodes")
-            if (key === socketId) {
-                console.log('skip output(id=' + key + ') because same id=' + id);
-            } else {
-                let otherOutputNode = outputNodes[key];
-                micNode.connect(otherOutputNode);
+        if (isMixingPeer) {
+            let micNode = audioContext.createMediaStreamSource(stream);
+            micNodes[socketId] = micNode;
+            for (const [sock, _] of Object.entries(RTCConnections)) {
+                if (sock !== socketId) {
+                    micNode.connect(outputNodes[sock]);
+                }
             }
         }
-
     };
+}
+
+function initNewRTCConnection(socketId) {
+    let rtcConnection = new RTCPeerConnection();
+    if (isMixingPeer) {
+        outputNodes[socketId] = audioContext.createMediaStreamDestination();
+        for (const [sock, _] of Object.entries(RTCConnections)) {
+            if (sock !== socketId) {
+                micNodes[sock].connect(outputNodes[socketId]);
+            }
+        }
+    }
+    rtcConnection.ontrack = getOntrackFunction(socketId);
     RTCConnections[socketId] = rtcConnection;
     activeConnectionSize++;
     RTCConnectionsCallStatus[socketId] = false;
     if (isMixingPeer) {
-        window.localStream.getTracks().forEach(track => rtcConnection.addTrack(track, mixStream));
-        muteRemoteVideos();
-    } else {
+        if (mixingPeers.includes(socketId)) {
+            mixerMixedStream.getTracks().forEach(track => {
+                if (track.kind === "video") {
+                    console.log("Added video track to new rtc connection")
+                    rtcConnection.addTrack(track, mixerMixedStream);
+                }
+            });
+            rtcConnection.addTrack(outputNodes[socketId].stream.getAudioTracks()[0], mixerMixedStream);
+        } else {
+            peerMixedStream.getTracks().forEach(track => {
+                if (track.kind === "video") {
+                    console.log("Added video track to new rtc connection")
+                    rtcConnection.addTrack(track, peerMixedStream);
+                }
+            });
+            rtcConnection.addTrack(outputNodes[socketId].stream.getAudioTracks()[0], peerMixedStream);
+        }
+    } else if (mixingPeers.length === 0) {
+        // If no mixing peers, we want to stream video to everyone
+        window.localStream.getTracks().forEach(track => rtcConnection.addTrack(track, window.localStream));
+    } else if (mixingPeers.includes(socketId)) {
+        // If there are mixing peers, we only want to stream video to the mixers
         window.localStream.getTracks().forEach(track => rtcConnection.addTrack(track, window.localStream));
     }
-    ctxMix.beginPath();
-    ctxMix.rect(0, 0, widestVid, tallestVid);
-    ctxMix.fillStyle = "black";
-    ctxMix.fill();
+    //Reset animation background
+    resetCanvases();
+    // Some other init tied to the connection
+    electionPointsReceived[socketId] = false;
 }
 
 function muteRemoteVideos() {
@@ -387,29 +561,384 @@ async function callUser(socketId) {
     });
 }
 
+let stoppedStream = false;
+let stoppedStreams = {}
+
+function toggleEncoding(id) {
+    if (!stoppedStreams.hasOwnProperty(id)) {
+        stoppedStreams[id] = false;
+    }
+    if (!stoppedStreams[id]) {
+        let senders = RTCConnections[id].getSenders();
+        for (let i = 0; i < senders.length; i++) {
+            senders[i].replaceTrack(null).then(_ => console.log("Stopped a track"))
+        }
+        stoppedStreams[id] = true;
+
+    } else {
+        let tracks = window.localStream.getTracks();
+        let senders = RTCConnections[id].getSenders();
+        for (let i = 0; i < senders.length; i++) {
+            senders[i].replaceTrack(tracks[i]).then(_ => console.log("Restarted a track"))
+        }
+        stoppedStreams[id] = false;
+    }
+}
+
+function pauseNonMixerStreams() {
+    for (const [sock, _] of Object.entries(RTCConnections)) {
+        if (!mixingPeers.includes(sock)) {
+            let senders = RTCConnections[sock].getSenders();
+            console.assert(senders.length === 2);
+            console.log(dummyAudioStream.getAudioTracks()[0]);
+            console.log(dummyVideoStream.getVideoTracks()[0])
+            for (let i = 0; i < senders.length; i++) {
+                if (senders[i].track.kind === "audio") {
+                    senders[i].replaceTrack(dummyAudioStream.getAudioTracks()[0]).then(_ => console.log("Replaced with dummy audio track"))
+                } else if (senders[i].track.kind === "video") {
+                    senders[i].replaceTrack(dummyVideoStream.getVideoTracks()[0]).then(_ => console.log("Replaced with dummy video track"))
+                }
+            }
+        }
+    }
+}
+
+function resumeNonMixerStreams() {
+    let tracks = window.localStream.getTracks();
+    for (const [sock, _] of Object.entries(RTCConnections)) {
+        if (!mixingPeers.includes(sock)) {
+            let senders = RTCConnections[sock].getSenders();
+            for (let i = 0; i < senders.length; i++) {
+                senders[i].replaceTrack(tracks[i]).then(_ => console.log("Restarted a track"))
+            }
+        }
+    }
+}
+
 function gotStream(stream) {
     console.log('Received local stream');
     const localVideo = document.getElementById("local-video");
     localVideo.srcObject = stream;
     window.localStream = stream;
+    audioContext.resume();
     if (isMixingPeer) {
-        window.localStream = mixStream;
-        let newOutputNode = audioContext.createMediaStreamDestination();
-        let newAudioMixStream = newOutputNode.stream;
-        outputNodes[-1] = newOutputNode;
-        audioMixStreams[-1] = newAudioMixStream;
-        for (let key in micNodes) {
-            if (key === -1) {
-                console.log('skip mic(id=' + key + ') because same id=' + id);
-            } else {
-                console.log('connect mic(id=' + key + ') to this output');
-                let otherMicNode = micNodes[key];
-                otherMicNode.connect(newOutputNode);
+        outputNode = audioContext.createMediaStreamDestination();
+        outputNodes[socket.id] = outputNode;
+        audioMixStream = outputNode.stream;
+        let micNode = audioContext.createMediaStreamSource(stream);
+        micNodes[socket.id] = micNode
+        micNode.connect(outputNode)
+        const audioTrack = audioMixStream.getAudioTracks()[0];
+        window.localStream.addTrack(audioTrack)
+    } else {
+        const audioTrack = stream.getAudioTracks()[0];
+        window.localStream.addTrack(audioTrack)
+    }
+}
+
+async function benchMarkAllKnownPeers() {
+    for (const [sock, _] of Object.entries(dataChannels)) {
+        await benchMarkPeer(sock);
+    }
+}
+
+function becomeMixer() {
+    peerMixedStream = canvasForPeers.captureStream(15);
+    mixerMixedStream = canvasForMixers.captureStream(15);
+    animationId = window.requestAnimationFrame(drawPeerCanvas)
+    isMixingPeer = true;
+    mixingPeers.push(socket.id);
+    const localVideo = document.getElementById("local-video");
+    window.localStream = peerMixedStream;
+    outputNode = audioContext.createMediaStreamDestination();
+    audioMixStream = outputNode.stream;
+    let myMicNode = audioContext.createMediaStreamSource(localVideo.srcObject);
+    myMicNode.connect(outputNode)
+    window.localStream.addTrack(audioMixStream.getAudioTracks()[0])
+    let tracks = window.localStream.getTracks();
+    for (const [sock, _] of Object.entries(RTCConnections)) {
+        const remoteVideo = document.getElementById(sock);
+        if (remoteVideo) {
+            micNodes[sock] = audioContext.createMediaStreamSource(remoteVideo.srcObject);
+            let out = audioContext.createMediaStreamDestination();
+            outputNodes[sock] = out;
+            myMicNode.connect(out)
+        }
+    }
+
+    for (const [sock, _] of Object.entries(RTCConnections)) {
+        for (const [peer, _] of Object.entries(RTCConnections)) {
+            if (sock !== peer) {
+                micNodes[peer].connect(outputNodes[sock]);
             }
         }
-        window.localStream.addTrack(newAudioMixStream.getAudioTracks()[0])
+    }
+
+    for (const [sock, _] of Object.entries(RTCConnections)) {
+        let senders = RTCConnections[sock].getSenders();
+        console.assert(senders.length === 2);
+        for (let i = 0; i < senders.length; i++) {
+            if (mixingPeers.includes(sock)) {
+                // TODO probably a bug here
+                console.assert(outputNodes[sock].stream.getAudioTracks()[0] !== null)
+                if (senders[i].track.kind === "audio") {
+                    senders[i].replaceTrack(outputNodes[sock].stream.getAudioTracks()[0]).then(_ => "Replaced track");
+                } else if (senders[i].track.kind === "video") {
+                    console.assert(mixerMixedStream.getVideoTracks()[0] !== null)
+                    senders[i].replaceTrack(mixerMixedStream.getVideoTracks()[0]).then(_ => "Replaced track");
+                }
+            } else {
+                if (senders[i].track.kind === "audio") {
+                    senders[i].replaceTrack(outputNodes[sock].stream.getAudioTracks()[0]).then(_ => "Replaced track");
+                } else if (senders[i].track.kind === "video") {
+                    console.assert(peerMixedStream.getVideoTracks()[0] !== null)
+                    senders[i].replaceTrack(peerMixedStream.getVideoTracks()[0]).then(_ => "Replaced track");
+                }
+            }
+
+        }
+    }
+    /*for (let i = 0; i < tracks.length; i++) {
+        var sender = RTCConnections[sock].getSenders().find(function (s) {
+            return s.track.kind === tracks[i].kind;
+        });
+        if (sender.track.kind === "audio") {
+            sender.replaceTrack(outputNodes[sock].stream.getAudioTracks()[0]).then(_ => "Replaced track");
+        } else {
+            sender.replaceTrack(tracks[i]).then(_ => "Replaced track");
+        }
+    }*/
+
+    for (const [sock, _] of Object.entries(dataChannels)) {
+        dataChannels[sock].send(JSON.stringify({
+            type: "mixerStatus",
+            origin: socket.id,
+            mixers: mixingPeers
+        }))
+    }
+}
+
+function bruteForceElectionInMyFavour() {
+    supremeMixerPeer = true;
+    electionInitiated = true;
+    electionBenchMarksSent = true;
+    networkSplit[socket.id] = Array.from(roomConnectionsSet);
+    becomeMixer();
+
+    let fascistOrder = {
+        type: "debugging",
+        origin: socket.id
+    }
+    sendToAll(JSON.stringify(fascistOrder));
+}
+
+let electionBenchMarksSent = false;
+
+async function evaluateElectionNeed(sock) {
+    // We want at least 5 reports before we can establish
+    if (electionInitiated && !electionBenchMarksSent) {
+        for (const [sock, _] of Object.entries(RTCConnections)) {
+            await benchMarkPeer(sock);
+        }
+        electionBenchMarksSent = true;
+    }
+    if (electionInitiated && electionBenchMarksSent) {
+        return
+    }
+    let electionNeeded = false;
+    if (bitRates[sock].length > 0) {
+        let res = lastResult[sock];
+        res.forEach(report => {
+            if (report.type === 'outbound-rtp') {
+                var str = report.id;
+                var str_pos = str.indexOf("Video");
+                if (!(str_pos > -1)) {
+                    // Ignores reports from 'audio' channels for instance. Video channels are the significant factor in bitrate
+                    return
+                }
+                if (report.isRemote) {
+                    return;
+                }
+                /*  console.log(report)
+                  console.log(Object.keys(report))*/
+                if (report.qualityLimitationResolutionChanges >= 5 || report.pliCount >= 3) {
+                    //Resolution changes is in-built webRTC. Resolution changes if GPU stutters or not enough broadband
+                    //pliCount is a packet response if video specifically drops a frame
+                    electionNeeded = true;
+                }
+            }
+        })
+    }
+    if (electionNeeded && !electionInitiated) {
+        console.log("I initiated an election")
+        electionInitiated = true;
+        let flag = {type: "initiateElection", origin: socket.id}
+        sendToAll(JSON.stringify(flag))
+        for (const [sock, _] of Object.entries(RTCConnections)) {
+            await benchMarkPeer(sock);
+        }
+        electionBenchMarksSent = true;
+    }
+}
+
+async function forceElection() {
+    electionInitiated = true;
+    let flag = {type: "initiateElection", origin: socket.id}
+    sendToAll(JSON.stringify(flag))
+    for (const [sock, _] of Object.entries(RTCConnections)) {
+        await benchMarkPeer(sock);
+    }
+    electionBenchMarksSent = true;
+}
+
+async function bitRateEveryone() {
+    if (debugging) return;
+    for (const [sock, _] of Object.entries(RTCConnections)) {
+        bitRateBenchMark(sock);
+        await evaluateElectionNeed(sock);
+    }
+}
+
+let networkSplit = {}
+
+function sendNetworkSplit() {
+    let message = {
+        type: "networkSplit",
+        origin: socket.id,
+        networkData: networkSplit
+    }
+    sendToAll(JSON.stringify(message));
+}
+
+async function pollMixerPerformance() {
+    console.log("PollMixerPerformance")
+    if (!supremeMixerPeer) return;
+    console.log("PollMixerPerformance: I am supreme")
+
+    let newSplitWanted = false
+    for (const [sock, _] of Object.entries(networkSplit)) {
+        if (networkSplit[sock].length > allowedSubNetworkSize) newSplitWanted = true;
+    }
+    console.log("PollMixerPerformance: newsplitWanted =" + newSplitWanted)
+
+    if (newSplitWanted) {
+        let quotient = Math.floor(roomConnectionsSet.size / mixingPeers.length)
+        console.log("PollMixerPerformance: quotient = " + quotient)
+
+        let remainder = roomConnectionsSet.size % mixingPeers.length;
+        console.log("PollMixerPerformance: remainder = " + remainder)
+
+        if ((quotient + remainder) > allowedSubNetworkSize) {
+            // Can't possibly split network so each mixer has < 3 peers
+            let peersToDistribute = Object.keys(RTCConnections);
+            console.log("PollMixerPerformance: peersToDistribute = " + peersToDistribute)
+            let newMixerFound = false;
+            let candidate;
+            while (!newMixerFound) {
+                let item = peersToDistribute[Math.floor(Math.random() * peersToDistribute.length)];
+                if (!mixingPeers.includes(item)) {
+                    candidate = item;
+                    newMixerFound = true;
+                }
+            }
+            mixingPeers.push(candidate);
+            networkSplit[candidate] = [];
+            console.log("PollMixerPerformance: mixingPeers = " + mixingPeers);
+            console.log("PollMixerPerformance: peersToDistribute = " + peersToDistribute);
+            peersToDistribute = peersToDistribute.filter(elem => elem !== candidate);
+            console.log("PollMixerPerformance: peersToDistribute = " + peersToDistribute);
+            quotient = Math.floor(peersToDistribute.length / mixingPeers.length)
+            remainder = peersToDistribute.length % mixingPeers.length;
+            for (const [sock, _] of Object.entries(networkSplit)) {
+                networkSplit[sock] = [];
+                for (let i = 0; i < quotient; i++) {
+                    networkSplit[sock].push(peersToDistribute.pop());
+                }
+                if (remainder > 0) {
+                    remainder--;
+                    networkSplit[sock].push(peersToDistribute.pop());
+                }
+            }
+            //TODO push out network status to all peers
+            sendNetworkSplit();
+            rebootStreamTargets();
+            //TODO make them respond
+            //TODO make them pause to the appropriate mixers
+        } else {
+            // We simply need to redistribute
+            console.log("Should not be able to get down here - redistribute network")
+        }
+    }
+    sendNetworkSplit();
+}
+
+let supremeMixerPeer = false;
+setInterval(bitRateEveryone, 1000 * 15);
+setInterval(pollMixerPerformance, 1000 * 30);
+
+function bitRateBenchMark(socketID) {
+    if (!bitRates[socketID]) {
+        bitRates[socketID] = [];
+        frameEncodeTimes[socketID] = [];
+    }
+
+    RTCConnections[socketID].getStats().then(res => {
+        res.forEach(report => {
+            let bytes;
+            let headerBytes;
+            //let packets;
+            if (report.type === 'outbound-rtp') {
+                var str = report.id;
+                var str_pos = str.indexOf("Video");
+                if (!(str_pos > -1)) {
+                    // Ignores reports from 'audio' channels for instance. Video channels are the significant factor in bitrate
+                    return
+                }
+                if (report.isRemote) {
+                    return;
+                }
+                const now = report.timestamp;
+                bytes = report.bytesSent;
+                headerBytes = report.headerBytesSent;
+                //packets = report.packetsSent;
+                if (lastResult[socketID] && lastResult[socketID].has(report.id)) {
+                    const deltaFrames = report.framesEncoded - lastResult[socketID].get(report.id).framesEncoded;
+                    const deltaTimeF = report.totalEncodeTime - lastResult[socketID].get(report.id).totalEncodeTime;
+                    const avgFrameEncodeTimeSinceLast = deltaTimeF / deltaFrames;
+                    const deltaT = now - lastResult[socketID].get(report.id).timestamp;
+                    // calculate bitrate
+                    const bitrate = 8 * (bytes - lastResult[socketID].get(report.id).bytesSent) /
+                        deltaT;
+                    //const headerrate = 8 * (headerBytes - lastResult[socketID].get(report.id).headerBytesSent) /
+                    //    deltaT;
+                    bitRates[socketID].push(bitrate);
+                    frameEncodeTimes[socketID].push(avgFrameEncodeTimeSinceLast);
+                }
+            }
+        });
+        lastResult[socketID] = res;
+    });
+}
+
+async function benchMarkPeer(socketID) {
+    if (dataChannels.hasOwnProperty(socketID)) {
+        //This part benchmarks by sending out 4mb arrays to each peer (array in segment of 8kb)
+        var d = new Date(); // for now
+        let start = d.getTime();
+        var array = new Uint8Array(benchmarkPackSize);  // allocates KByte * 10
+        array.fill(1)
+        let data = {
+            type: "benchmarkOut",
+            origin: socket.id,
+            ts: start,
+            buff: Array.from(array)
+        }
+        let realdata = JSON.stringify(data);
+        for (let i = 0; i < benchmarkPacketNums; i++) {
+            dataChannels[socketID].send(realdata);
+        }
     } else {
-        window.localStream.addTrack(stream.getAudioTracks()[0])
+        console.log("Tried to benchmark a non-existing datachannel socket: " + socketID)
     }
 }
 
@@ -419,39 +948,351 @@ function sendToAll(data) {
     }
 }
 
+
+function rankAndAwardMixerPoints() {
+    let bitRatePool = 0;
+    let totalEncodingTime = 0;
+    let totalArraySpeed = 0;
+    for (const [sock, _] of Object.entries(benchmarkResponses)) {
+        totalEncodingTime += benchmarkResponses[sock]["avgEncodingSpeed"];
+        totalArraySpeed += benchmarkResponses[sock]["arraySpeed"];
+        if (!peerElectionPoints.hasOwnProperty(sock)) {
+            peerElectionPoints[sock] = 0;
+        }
+    }
+    for (const [_, ratesArray] of Object.entries(bitRates)) {
+        if (ratesArray.length === 0) continue;
+        let totalAverage = ratesArray.reduce((sum, num) => sum + num) / ratesArray.length
+        bitRatePool += totalAverage;
+    }
+    let myOutGoingPoints = {}
+    for (const [sock, _] of Object.entries(benchmarkResponses)) {
+        let points = 0;
+        let peerAverage = 0;
+        if (bitRates.hasOwnProperty(sock) && bitRates[sock].length !== 0) {
+            peerAverage = bitRates[sock].reduce((sum, num) => sum + num) / bitRates[sock].length
+        }
+        let peerAveragePoints;
+        if (bitRatePool === 0) {
+            peerAveragePoints = 0;
+        } else {
+            peerAveragePoints = peerAverage / bitRatePool * 100;
+        }
+        //let frameEncodingPoints = totalEncodingTime / benchmarkResponses[sock]["avgEncodingSpeed"] * (1 / 100);
+        let frameEncodingPoints = -(benchmarkResponses[sock]["avgEncodingSpeed"] / totalEncodingTime * 100);
+        let arrayTransferPoints = benchmarkResponses[sock]["arraySpeed"] / totalArraySpeed * 100;
+        console.log("Points awarded to " + sock)
+        console.log("Bitrate points: " + peerAveragePoints)
+        console.log("Frame points: " + frameEncodingPoints)
+        console.log("Frame time peer: " + benchmarkResponses[sock]["avgEncodingSpeed"])
+        console.log("Frame time total: " + totalEncodingTime)
+        console.log("Array points: " + arrayTransferPoints)
+        points = Math.floor(peerAveragePoints + frameEncodingPoints + arrayTransferPoints);
+        myOutGoingPoints[sock] = points;
+        peerElectionPoints[sock] += points;
+
+    }
+    let electionObject = {
+        type: "electionPoints",
+        origin: socket.id,
+        points: myOutGoingPoints
+    }
+    sendToAll(JSON.stringify(electionObject));
+    electionPointsReceived[socket.id] = true;
+    electMixersIfValid()
+}
+
+
+function electMixers(mixerSpots) {
+    // Create items array
+    console.log("Printing Election Results")
+    for (const [sock, points] of Object.entries(peerElectionPoints)) {
+        console.log(sock + " has " + points);
+    }
+    var candidates = Object.keys(peerElectionPoints).map(function (key) {
+        return [key, peerElectionPoints[key]];
+    });
+
+// Sort the array based on the second element
+    candidates.sort(function (first, second) {
+        if (first[1] === second[1]) return second[0].localeCompare(first[0]);
+        return second[1] - first[1];
+    });
+
+// Create a new array with only the first 5 items
+    console.log(candidates)
+    let ranked = candidates.slice(0, mixerSpots);
+    if (ranked[0][0] === socket.id) {
+        console.log("I became mixer")
+        mixingPeers.push(ranked[0][0])
+        // We should only have one mixer at this point.
+        console.assert(mixingPeers.length === 1)
+        supremeMixerPeer = true;
+        networkSplit[socket.id] = Array.from(roomConnectionsSet);
+        becomeMixer();
+    } else {
+        mixingPeers.push(ranked[0][0])
+        pauseNonMixerStreams();
+    }
+}
+
+function electMixersIfValid() {
+    for (const [sock, _] of Object.entries(electionPointsReceived)) {
+        console.log("In loop, also I am " + socket.id)
+        console.log(sock)
+        if (electionPointsReceived[sock] === false) {
+            console.log(sock + " has value " + electionPointsReceived[sock])
+            return;
+        }
+    }
+    electMixers(1);
+}
+
+function handleTurningNonMixer() {
+    isMixingPeer = false;
+}
+
+function resetCanvases() {
+    peerCanvasContext.beginPath();
+    peerCanvasContext.rect(0, 0, widestVid, tallestVid);
+    peerCanvasContext.fillStyle = "black";
+    peerCanvasContext.fill();
+
+    mixerCanvasContext.beginPath();
+    mixerCanvasContext.rect(0, 0, widestVid, tallestVid);
+    mixerCanvasContext.fillStyle = "black";
+    mixerCanvasContext.fill();
+}
+
+function rebootStreamTargets() {
+    if (!isMixingPeer) {
+        //I am a regular client, and I should only stream video/audio to the mixer
+        let myMixer;
+        for (const [sock, arr] of Object.entries(networkSplit)) {
+            if (arr.includes(socket.id)) {
+                myMixer = sock;
+                //Send actual video to mixer
+                let tracks = window.localStream.getTracks();
+                let senders = RTCConnections[sock].getSenders();
+                for (let i = 0; i < senders.length; i++) {
+                    senders[i].replaceTrack(tracks[i]).then(_ => console.log("Restarted a track"))
+                }
+            }
+        }
+        console.assert(myMixer !== undefined);
+        for (const [sock, _] of Object.entries(RTCConnections)) {
+            if (sock !== myMixer) {
+                let senders = RTCConnections[sock].getSenders();
+                for (let i = 0; i < senders.length; i++) {
+                    //senders[i].replaceTrack(null).then(_ => console.log("Stopped a track"))
+                    if (senders[i].track.kind === "audio") {
+                        senders[i].replaceTrack(dummyAudioStream.getAudioTracks()[0]).then(_ => console.log("Replaced with dummy audio track"))
+                    } else if (senders[i].track.kind === "video") {
+                        senders[i].replaceTrack(dummyVideoStream.getVideoTracks()[0]).then(_ => console.log("Replaced with dummy video track"))
+                    }
+                }
+            }
+        }
+    } else {
+        //TODO handle what the mixing peer should do
+        resetCanvases();
+        let myPeers = networkSplit[socket.id];
+        let otherMixers = Object.keys(networkSplit);
+        for (const [sock, _] of Object.entries(RTCConnections)) {
+            let senders = RTCConnections[sock].getSenders();
+            console.assert(senders.length === 2);
+            for (let i = 0; i < senders.length; i++) {
+                if (otherMixers.includes(sock)) {
+                    console.assert(outputNodes[sock].stream.getAudioTracks()[0] !== null)
+                    if (senders[i].track.kind === "audio") {
+                        senders[i].replaceTrack(outputNodes[sock].stream.getAudioTracks()[0]).then(_ => "Replaced track");
+                    } else if (senders[i].track.kind === "video") {
+                        console.assert(mixerMixedStream.getVideoTracks()[0] !== null)
+                        senders[i].replaceTrack(mixerMixedStream.getVideoTracks()[0]).then(_ => "Replaced track");
+                    }
+                } else if (myPeers.includes(sock)) {
+                    if (senders[i].track.kind === "audio") {
+                        senders[i].replaceTrack(outputNodes[sock].stream.getAudioTracks()[0]).then(_ => "Replaced track");
+                    } else if (senders[i].track.kind === "video") {
+                        console.assert(peerMixedStream.getVideoTracks()[0] !== null)
+                        senders[i].replaceTrack(peerMixedStream.getVideoTracks()[0]).then(_ => "Replaced track");
+                    }
+                } else {
+                    if (senders[i].track.kind === "audio") {
+                        senders[i].replaceTrack(dummyAudioStream.getAudioTracks()[0]).then(_ => console.log("Replaced with dummy audio track"))
+                    } else if (senders[i].track.kind === "video") {
+                        senders[i].replaceTrack(dummyVideoStream.getVideoTracks()[0]).then(_ => console.log("Replaced with dummy video track"))
+                    }
+                }
+            }
+        }
+    }
+}
+
 function onReceiveMessageCallback(event) {
-    console.log(`Received Message ${event.data}`);
+    // console.log(`Received Message ${event.data}`);
     let data = JSON.parse(event.data)
+    let replyChannel = event.target;
     switch (data.type) {
+        case "debugging":
+            electionInitiated = true;
+            electionBenchMarksSent = true;
+            mixingPeers = [data.origin]
+            pauseNonMixerStreams();
+            break;
+        case "electionPoints":
+            for (const [id, votes] of Object.entries(data.points)) {
+                if (!peerElectionPoints.hasOwnProperty(id)) {
+                    peerElectionPoints[id] = 0;
+                }
+                peerElectionPoints[id] = peerElectionPoints[id] + votes;
+                console.log(id + " got " + votes + " from " + data.origin);
+            }
+            electionPointsReceived[data.origin] = true;
+            electMixersIfValid()
+            break;
         case "chat":
             postChatMessage(data.message, data.nickname)
             break;
+        case "networkSplit":
+            console.log("In networkSplit")
+            console.log(data.networkData);
+            for (const [id, _] of Object.entries(data.networkData)) {
+                console.log(data.networkData[id])
+            }
+            networkSplit = data.networkData;
+            let newMixers = Object.keys(networkSplit);
+            mixingPeers = newMixers;
+            let clientInMixerChoices = mixingPeers.includes(socket.id);
+            if (isMixingPeer && !clientInMixerChoices) {
+                console.log("Turn nonmixer")
+                postChatMessage("Turn nonmixer", socket.id)
+                handleTurningNonMixer();
+            } else if (!isMixingPeer && clientInMixerChoices) {
+                console.log("Turn mixer from networkSplit update")
+                postChatMessage("Turn mixer from networkSplit update", socket.id)
+                becomeMixer();
+                rebootStreamTargets();
+            } else if (!isMixingPeer && !clientInMixerChoices) {
+                //My status didn't change, but the mixer I should stream to might
+                console.log("rebootStreamTargets")
+                rebootStreamTargets();
+            }
+            break;
         case "file":
-            receiveBuffer.push(event.data);
-            receivedSize += event.data.byteLength;
-            receiveProgress.value = receivedSize;
+            if (timestampStart == -1) {
+                let timestampStart = (new Date()).getTime()
+            }
+            let payload = data.payload;
+            console.log("payload")
+            console.log(payload)
+            let buffer = decode(payload)
+            console.log("buffer")
+            console.log(buffer)
+            receiveBuffers[data.hash].push(buffer);
+            console.log("old size: " + filemetadata[data.hash].receivedSize)
+            filemetadata[data.hash].receivedSize += buffer.byteLength
+            console.log("new size: " + filemetadata[data.hash].receivedSize)
             // we are assuming that our signaling protocol told
             // about the expected file size (and name, hash, etc).
-            const file = fileInput.files[0];
-            if (receivedSize === file.size) {
-                const received = new Blob(receiveBuffer);
-                receiveBuffer = [];
-                downloadAnchor.href = URL.createObjectURL(received);
-                downloadAnchor.download = file.name;
-                downloadAnchor.textContent =
-                    `Click to download '${file.name}' (${file.size} bytes)`;
-                downloadAnchor.style.display = 'block';
-
-                const bitrate = Math.round(receivedSize * 8 /
-                    ((new Date()).getTime() - timestampStart));
-                bitrateDiv.innerHTML =
-                    `<strong>Average Bitrate:</strong> ${bitrate} kbits/sec (max: ${bitrateMax} kbits/sec)`;
-
+            if (filemetadata[data.hash].receivedSize === filemetadata[data.hash].size) {
+                console.log("Received file")
+                const received = new Blob(receiveBuffers[data.hash]);
+                console.log(received)
+                const name = filemetadata[data.hash].name
+                receiveBuffers[data.hash] = [];
+                filetransfer.makeDownloadLink(received, filemetadata[data.hash]);
+                //const bitrate = Math.round(filemetadata[data.hash].receivedSize * 8 /
+                //    ((new Date()).getTime() - timestampStart));
+                //bitrateDiv.innerHTML =
+                //    `<strong>Average Bitrate:</strong> ${bitrate} kbits/sec (max: ${bitrateMax} kbits/sec)`;
+                timestampStart = -1
                 if (statsInterval) {
                     clearInterval(statsInterval);
                     statsInterval = null;
                 }
             }
+            break;
+        case "initiateElection":
+            electionInitiated = true;
+            console.log("Got initiate election flag")
+            break;
+        case "benchmarkOut":
+            console.log("Benchmark packet")
+            if (!benchmarkBuffers.hasOwnProperty(data.origin)) {
+                benchmarkBuffers[data.origin] = [];
+            }
+            data.buff.forEach(byte => benchmarkBuffers[data.origin].push(byte));
+            if (benchmarkBuffers[data.origin].length === benchmarkSize) {
+                var d = new Date(tsync.now()); // for now
+                let deltaTS = (d.getTime() - data.ts) / 1000; //Diff in seconds
+                let speed = benchmarkSize / deltaTS;
+                let mBSSpeed = speed / (1024 * 1024);
+                let avgEncoding;
+                //benchmarkResponses[data.origin] = mBSSpeed;
+                if (!frameEncodeTimes.hasOwnProperty(data.origin) || frameEncodeTimes[data.origin].length < 2) {
+                    avgEncoding = 0
+                } else {
+                    avgEncoding = frameEncodeTimes[data.origin].reduce((sum, num) => {
+                        return sum + num
+                    }) / frameEncodeTimes[data.origin].length;
+                }
+
+                let
+                    response = {
+                        type: "benchMarkResponse",
+                        origin: socket.id,
+                        benchmark: mBSSpeed,
+                        avgEncodingSpeed: avgEncoding
+                    }
+                dataChannels[data.origin].send(JSON.stringify(response))
+                benchmarkBuffers[data.origin] = [];
+            }
+            break;
+        case "mixerStatusResponse":
+            data.mixers.forEach(newMixer => {
+                if (!mixingPeers.includes(newMixer)) {
+                    mixingPeers.push(newMixer)
+                    if (isMixingPeer) {
+                        var sender = RTCConnections[newMixer].getSenders().find(function (s) {
+                            return s.track.kind === "video";
+                        });
+                        sender.replaceTrack(mixerMixedStream.getVideoTracks()[0]).then(_ => "Replaced inside response");
+                    }
+                }
+            })
+            break;
+        case "mixerStatus":
+            data.mixers.forEach(newMixer => {
+                if (!mixingPeers.includes(newMixer)) {
+                    mixingPeers.push(newMixer)
+                    if (isMixingPeer) {
+                        var sender = RTCConnections[newMixer].getSenders().find(function (s) {
+                            return s.track.kind === "video";
+                        });
+                        sender.replaceTrack(mixerMixedStream.getVideoTracks()[0]).then(_ => "Replaced inside response");
+                    }
+                }
+            })
+            if (mixingPeers.length !== 0) {
+                electionInitiated = true; //Election already held
+                if (!isMixingPeer) {
+                    pauseNonMixerStreams();
+                }
+            }
+            let response = {
+                type: "mixerStatusResponse",
+                origin: socket.id,
+                mixers: mixingPeers
+            }
+            dataChannels[data.origin].send(JSON.stringify(response))
+            break;
+        case "benchMarkResponse":
+            console.log("Got a benchmark back from " + data.origin)
+            benchmarkResponses[data.origin] = {};
+            benchmarkResponses[data.origin]["arraySpeed"] = data.benchmark;
+            benchmarkResponses[data.origin]["avgEncodingSpeed"] = data.benchmark;
+            if (Object.keys(benchmarkResponses).length === roomConnectionsSet.size) rankAndAwardMixerPoints()
             break;
         case "mixerSignal":
             console.log("Got mixer signal from: " + data.origin);
@@ -462,56 +1303,53 @@ function onReceiveMessageCallback(event) {
         case "requestNetworkNodes":
             var myNeighbours = JSON.stringify({ nodes: Array.from(roomConnectionsSet), type: "requestNetworkCallback", origin: socket.id })
             event.target.send(myNeighbours)
-            break;
-        case "requestMixingPeers":
-            var mixingPeers = JSON.stringify({ nodes: Array.from(mixingPeerCollection), type: "requestMixingPeerCallback", origin: socket.id })
-            event.target.send(mixingPeers)
-            break;
-        case "requestNetworkSplit":
-            console.log("Now im here yo")
-            var split = JSON.stringify({ dataSplit: (networkSplit), type: "requestSplitCallback", origin: socket.id })
-            console.log(split)
-            event.target.send(split)
-            break;
-        case "requestSplitCallback":
-            console.log("No problem ejnar")
-            console.log(data.dataSplit)
-            console.log(netGraphTopologyData)
-            data.dataSplit.id1.forEach(it => {
-                if (findDuplicateNode != true) {
-                    netGraphTopologyData.nodes.push({id: it, group: "nonMixing"})
-                } 
-            })
+            break;       
+        // case "requestMixingPeers":
+        //     var mixingPeersToSend = JSON.stringify({ nodes: Array.from(mixingPeers), type: "requestMixingPeerCallback", origin: socket.id })
+        //     event.target.send(mixingPeersToSend)
+        //     break;
+        // case "requestNetworkSplit":
+        //     console.log("Now im here yo")
+        //     var split = JSON.stringify({ dataSplit: (testNetworkSplit), type: "requestSplitCallback", origin: socket.id })
+        //     console.log(split)
+        //     event.target.send(split)
+        //     break;
+        // case "requestSplitCallback":
+        //     console.log("No problem ejnar")
+        //     console.log(data.dataSplit)
+        //     console.log(netGraphTopologyData)
+        //     data.dataSplit.id1.forEach(it => {
+        //         if (findDuplicateNode != true) {
+        //             netGraphTopologyData.nodes.push({id: it, group: "nonMixing"})
+        //         } 
+        //     })
 
-            data.dataSplit.id2.forEach(it2 => {
-                if (findDuplicateNode != true) {
-                    netGraphTopologyData.nodes.push({id: it2, group: "nonMixing"})
-                }
-            })
+        //     data.dataSplit.id2.forEach(it2 => {
+        //         if (findDuplicateNode != true) {
+        //             netGraphTopologyData.nodes.push({id: it2, group: "nonMixing"})
+        //         }
+        //     })
 
-            for (var i = 0; i < data.dataSplit.id3.length; i++) {
-                if (findDuplicateNode != true) {
-                    netGraphTopologyData.nodes.push({id: data.dataSplit.id3[i], group: "mixing"})
-                }
-                addEdges(data.dataSplit.id3[i], data.dataSplit.id3)
+        //     for (var i = 0; i < data.dataSplit.id3.length; i++) {
+        //         if (findDuplicateNode != true) {
+        //             netGraphTopologyData.nodes.push({id: data.dataSplit.id3[i], group: "mixing"})
+        //         }
+        //         addEdges(data.dataSplit.id3[i], data.dataSplit.id3)
 
-                data.dataSplit.id2.forEach(it2 => {
-                    if (findDuplicateEdge(data.dataSplit.id3[1], it2) != true) {
-                        netGraphTopologyData.edges.push({from: data.dataSplit.id3[1], to: it2})
-                    }
-                })
+        //         data.dataSplit.id2.forEach(it2 => {
+        //             if (findDuplicateEdge(data.dataSplit.id3[1], it2) != true) {
+        //                 netGraphTopologyData.edges.push({from: data.dataSplit.id3[1], to: it2})
+        //             }
+        //         })
 
-                data.dataSplit.id1.forEach(it1 => {
-                    if (findDuplicateEdge(data.dataSplit.id3[0], it1) != true) {
-                        netGraphTopologyData.edges.push({from: data.dataSplit.id3[0], to: it1})
-                    }
-                })
-
-            
-
-            }
-            updateGraph()
-            break;    
+        //         data.dataSplit.id1.forEach(it1 => {
+        //             if (findDuplicateEdge(data.dataSplit.id3[0], it1) != true) {
+        //                 netGraphTopologyData.edges.push({from: data.dataSplit.id3[0], to: it1})
+        //             }
+        //         })
+        //     }
+        //     updateGraph()
+        //     break;    
         case "requestNetworkCallback":
             data.nodes
             console.log("data.nodes")
@@ -522,70 +1360,181 @@ function onReceiveMessageCallback(event) {
             console.log(roomConnectionsSet)
             console.log("socket id")
             console.log(socket.id)
+            const empty = {};
 
-            data.nodes.forEach(element => {
-                if (element != socket.id && findDuplicateNode(element) != true) {                                                                 //Case where we are looking at all the nodes that "me" is connected to
-                    netGraphTopologyData.nodes.push({ id: element, group: "nonMixing" })
-                    if (mixingPeerCollection.size == 0 && findDuplicateEdge("me", element) != true) {
-                        netGraphTopologyData.edges.push({ from: 'me', to: element })
-                        addEdges(element, data.nodes)
-                    }
-
-                } else {                                                                                                                            //Case where we are looking at the node id of "me"
-                    roomConnectionsSet.forEach(element1 => {
-                        if (findDuplicateNode(element1) != true) {
-                            netGraphTopologyData.nodes.push({ id: element1, group: "nonMixing" })
-                            if (mixingPeerCollection.size == 0 && findDuplicateEdge("me", element1) != true) {
-                                netGraphTopologyData.edges.push({ from: 'me', to: element1 })
-                                addEdges(element1, roomConnectionsSet)
+            if (Object.keys(networkSplit).length === 0) {
+                console.log("networkSplit is empty meaning no mixers")
+                data.nodes.forEach(element => {
+                    if (element != socket.id && findDuplicateNode(element) != true) {                                                                 //Case where we are looking at all the nodes that "me" is connected to
+                        netGraphTopologyData.nodes.push({ id: element, group: "nonMixing" })
+                        if (mixingPeers.length == 0 && findDuplicateEdge("me", element) != true) {
+                            netGraphTopologyData.edges.push({ from: 'me', to: element })
+                            addEdges(element, data.nodes)
+                        }
+    
+                    } else {                                                                                                                            //Case where we are looking at the node id of "me"
+                        roomConnectionsSet.forEach(element1 => {
+                            if (findDuplicateNode(element1) != true) {
+                                netGraphTopologyData.nodes.push({ id: element1, group: "nonMixing" })
+                                if (mixingPeers.length == 0 && findDuplicateEdge("me", element1) != true) {
+                                    netGraphTopologyData.edges.push({ from: 'me', to: element1 })
+                                    addEdges(element1, roomConnectionsSet)
+                                }
                             }
+                        })
+                    }
+                });
+            } else {
+                console.log("networkSplit is not empty so we have mixers")
+                console.log(networkSplit)
+                console.log(Object.keys(networkSplit))
+                setInitData()
+                
+                
+                //if (findDuplicateNode(Object.keys(networkSplit))!= true){
+                    //netGraphTopologyData.nodes.push({id: Object.keys(networkSplit), group: "mixing"})
+                //}
+                //Here add the correct nodes, meaning add the mixerPeers based on networkSplit
+                
+                Object.keys(networkSplit).forEach(key => {
+                    let value = networkSplit[key];
+                    console.log(value)
+                    if (key != socket.id) {
+                        if (findDuplicateNode(key)!= true){
+                            netGraphTopologyData.nodes.push({id: key, group: "mixing"})
+                            addEdges(key, Object.keys(networkSplit))
                         }
-                    })
-                }
-            });
-            updateGraph()
+
+                        value.forEach(item => {
+                            if (item != socket.id) { 
+                                if (findDuplicateNode(item) != true) {
+                                    netGraphTopologyData.nodes.push({id: item, group: "nonMixing"})
+                                }
+                                if (findDuplicateEdge(item, key) != true) {
+                                    netGraphTopologyData.edges.push({from: item, to: key})
+                                }
+                            } else {
+                                if (findDuplicateEdge("me", key) != true) {
+                                    netGraphTopologyData.edges.push({from: "me", to: key})
+                                }
+                            }
+                        })
+                    } else {
+                        console.log("So me should be mixing")
+                        netGraphTopologyData = {
+                            nodes: [
+                                { id: "me", group: "mixing" }
+                            ],
+                            edges: []
+                        }
+
+                        addEdges("me", Object.keys(networkSplit))
+            
+                        value.forEach(item => {
+                            if (item != socket.id) { 
+                                if (findDuplicateNode(item) != true) {
+                                    netGraphTopologyData.nodes.push({id: item, group: "nonMixing"})
+                                }
+                                if (findDuplicateEdge(item, "me") != true) {
+                                    netGraphTopologyData.edges.push({from: item, to: "me"})
+                                }
+                            } else {
+                                if (findDuplicateEdge("me", key) != true) {
+                                    netGraphTopologyData.edges.push({from: "me", to: key})
+                                }
+                            }
+                        })
+                    }
+
+                });
+
+            }
+            
+            
+            //updateGraph()
             break;
-        case "requestMixingPeerCallback":
-            data.nodes
-            data.nodes.forEach(element => {
-                if (element != socket.id) {
-                    setInitData()
-                    mixingPeerCollection.add(element)
-                    mixingPeerCollection.forEach(item => {
-                        if (findDuplicateNode(item) != true) {
-                            netGraphTopologyData.nodes.push({ id: item, group: "mixing" })
-                        }
-                    })
+        // case "requestMixingPeerCallback":
+        //     data.nodes
+        //     data.nodes.forEach(element => {
+        //         if (element != socket.id) {
+        //             setInitData()
+        //             //mixingPeers.push(element)
+        //             mixingPeers.forEach(item => {
+        //                 if (findDuplicateNode(item) != true) {
+        //                     netGraphTopologyData.nodes.push({ id: item, group: "mixing" })
+        //                 }
+        //             })
 
-                    if (mixingPeerCollection.size == 2) {
-                        twoMixerToplogy(data.nodes, roomConnectionsSet, element)
+        //             if (mixingPeers.length == 2) {
+        //                 twoMixerToplogy(data.nodes, roomConnectionsSet, element)
 
-                    }
-                    else if (findDuplicateEdge("me", element) != true) {
-                        netGraphTopologyData.edges.push({ from: 'me', to: element })
-                        addEdges(element, roomConnectionsSet)
-                    }
-                } else {
-                    roomConnectionsSet.forEach(elem => {
-                        if (elem != socket.id && findDuplicateEdge("me", elem) != true) {
-                            netGraphTopologyData.edges.push({ from: "me", to: elem })
-                        }
-                    })
-                }
+        //             }
+        //             else if (findDuplicateEdge("me", element) != true) {
+        //                 netGraphTopologyData.edges.push({ from: 'me', to: element })
+        //                 addEdges(element, roomConnectionsSet)
+        //             }
+        //         } else {
+        //             roomConnectionsSet.forEach(elem => {
+        //                 if (elem != socket.id && findDuplicateEdge("me", elem) != true) {
+        //                     netGraphTopologyData.edges.push({ from: "me", to: elem })
+        //                 }
+        //             })
+        //         }
+        //     });
+        //     break;
+        case "file-metadata":
+            receiveBuffers[data.hash] = [];
+            filemetadata[data.hash] = data
+            let reply = JSON.stringify({
+                type: "file-callback",
+                hash: data.hash
             });
+            filemetadata[data.hash].receivedSize = 0;
+            console.log(filemetadata[data.hash])
+            replyChannel.send(reply);
+            break;
+        case "file-callback":
+            peersReady[data.hash]++
+            let nmbrOfPeersReady = peersReady[data.hash]
+            let dataChannelsLength = Object.keys(dataChannels).length
+            let allPeersReady = nmbrOfPeersReady == dataChannelsLength
+            if (allPeersReady) {
+                filetransfer.sendData(dataChannels, data.hash, nickName)
+            } else {
+                console.log("peersReady: " + nmbrOfPeersReady)
+                console.log("datachannel length: " + dataChannelsLength)
+            }
+            break;
+        case "timesync":
+            let parsedData = data.tsdata;
+            tsync.receive(data.from, parsedData)
+            //let date = new Date(tsync.now())
+            //console.log("date: "+date)
             break;
         default:
             console.log("error: unknown message data type or malformed JSON format")
     }
 }
 
-async function sendMixerSignal() {
+let lastResult = {};
+
+function sendMixerSignal() {
     let data = {
         type: "mixerSignal",
         origin: socket.id
     }
     sendToAll(JSON.stringify(data));
 }
+
+function decode(str) {
+    var buf = new ArrayBuffer(str.length); // 2 bytes for each char
+    var bufView = new Uint8Array(buf);
+    for (var i = 0, strLen = str.length; i < strLen; i++) {
+        bufView[i] = str.charCodeAt(i);
+    }
+    return buf;
+}
+
 
 async function sendChatMessage(str) {
     let chatData = JSON.stringify({
@@ -616,6 +1565,7 @@ async function postChatMessage(str, nickname) {
         chatloglist.appendChild(chatEntryItem);
     }
 }
+
 
 function openPage(pageName, elmnt, color) {
     var i, tabcontent, tablinks;
@@ -756,13 +1706,13 @@ function removeNonExistentDataFromGraph(set) {
 }
 
 function updateOnRemove(set) {
-    if (mixingPeerCollection.size == 0) {
+    if (mixingPeers.length == 0) {
         if (netGraphTopologyData.nodes.length > (set.size) + 1) {
             setInitData()
         }
     } else {
         setInitData()
-        mixingPeerCollection.forEach(item => {
+        mixingPeers.forEach(item => {
             if (findDuplicateNode(item) != true && findDuplicateEdge("me", item)) {
                 netGraphTopologyData.edges.push({ from: "me", to: item })
             }
@@ -815,7 +1765,7 @@ function updateGraph() {
     // draw the chart
     //console.log(netGraphTopologyData)
     // if there is at least one mixerPeer create the group mixing
-    if (mixingPeerCollection.size > 0) {                                                            //Bug keep saying mixing is undefined
+    if (mixingPeers.length > 0) {                                                            //Bug keep saying mixing is undefined
         var mixing = netWorkChart.group("mixing");
         mixing.normal().shape("star5");
         mixing.normal().fill("#ffa000");
@@ -853,53 +1803,90 @@ function populateNetwork() {
     //are sent out to all other peers connected, and then the graph is updated according to the reponse the different peers¨
     //gives.
 
+    console.log("array of mixingPeers")
+    console.log(mixingPeers)
+    console.log(netGraphTopologyData)
+
     console.log("PopulateNetwork Function has been called!")
     if (isMixingPeer == true) {
         console.log("I am a mixing peer")
-        mixingPeerCollection.add(socket.id)
+        // if (findDuplicateNode(socket.id) != true){
+        //     netGraphTopologyData.nodes.push({id: socket.id, group: "mixing"})
+        // }
     }
+
+    
 
     anychart.onDocumentReady(function () {
         //TODO: 
         //Update graph also when peers leave the network. (DONE for non-mixing peers)
         //Update graph correct when there is two mixing peers
 
-        if (useNetWorkSplit == true) {
-            console.log("Hey ho im here")
-            setInitData()
-            //mixingPeerCollection.add("34kg3h5ghj2gdywtquyd34")
-            let requestBody = { type: "requestNetworkSplit" }
-            sendToAll(JSON.stringify(requestBody))
-            updateGraph()
-        } else {
-            console.log(netGraphTopologyData)
-            if (mixingPeerCollection.size == 0 && roomConnectionsSet.size == 0) {                  //Case when only one peer is connected, namely "me"
-                setInitData()
-                updateGraph()
-            }
-            if (mixingPeerCollection.size > 0 && roomConnectionsSet.size == 0) {                   //Case where there two peers connected one mixing and "me"
-                setInitData()
-                mixingPeerCollection.forEach(item => {
-                    if (findDuplicateNode(item) != true) {
-                        netGraphTopologyData.nodes.push({ id: item, group: "mixing" })
-                    }
-                    if (findDuplicateEdge("me", item) != true) {
-                        netGraphTopologyData.edges.push({ from: "me", to: item })
-                    }
-                })
-                updateGraph()
-            }
+        console.log(netGraphTopologyData)
+        console.log(networkSplit)
+        let requestBody = { type: "requestNetworkNodes" }
+        sendToAll(JSON.stringify(requestBody))
 
-            if (mixingPeerCollection.size >= 0) {                                                   //Case where there are multiple non-mixing peers and possibly multiple mixing peers.
-                let requestMixingBody = { type: "requestMixingPeers" }
-                sendToAll(JSON.stringify(requestMixingBody))
-                if (roomConnectionsSet.size > 0) {
-                    let requestBody = { type: "requestNetworkNodes" }
-                    sendToAll(JSON.stringify(requestBody))
-                }
-                updateGraph()
-            }
-        }
+
+        // if (useNetWorkSplit == true) {
+        //     console.log("Hey ho im here")
+        //     setInitData()
+        //     //mixingPeerCollection.add("34kg3h5ghj2gdywtquyd34")
+        //     let requestBody = { type: "requestNetworkSplit" }
+        //     sendToAll(JSON.stringify(requestBody))
+        //     updateGraph()
+        // } else {
+
+            
+            // if (mixingPeers.length == 0 && roomConnectionsSet.size == 0) {                  //Case when only one peer is connected, namely "me"
+            //     setInitData()
+            //     updateGraph()
+            // }
+            // if (mixingPeers.length > 0 && roomConnectionsSet.size == 0) {                   //Case where there two peers connected one mixing and "me"
+            //     setInitData()
+            //     mixingPeers.forEach(item => {
+            //         if (findDuplicateNode(item) != true) {
+            //             netGraphTopologyData.nodes.push({ id: item, group: "mixing" })
+            //         }
+            //         if (findDuplicateEdge("me", item) != true) {
+            //             netGraphTopologyData.edges.push({ from: "me", to: item })
+            //         }
+            //     })
+            //     updateGraph()
+            // }
+
+            // // if (mixingPeers.length >= 0) {                                                   //Case where there are multiple non-mixing peers and possibly multiple mixing peers.
+            // //     let requestMixingBody = { type: "requestMixingPeers" }
+            // //     sendToAll(JSON.stringify(requestMixingBody))
+            // //     if (roomConnectionsSet.size > 0) {
+            // //         let requestBody = { type: "requestNetworkNodes" }
+            // //         sendToAll(JSON.stringify(requestBody))
+            // //     }
+            // //     updateGraph()
+            // // }
+
+            // if (mixingPeers > 0) {
+            //     console.log("Entered case with mixers")
+            //     mixingPeers.forEach(item => {
+            //     if (item != socket.id) {
+            //          if (findDuplicateNode(item) != true) {
+            //             netGraphTopologyData.nodes.push({ id: item, group: "mixing" })
+            //         }
+            //     }    
+                   
+            //     })
+            //     let requestMixingBody = { type: "requestMixingPeers" }
+            //     sendToAll(JSON.stringify(requestMixingBody))
+            // }
+
+            // if (roomConnectionsSet.size > 0) {                                                   //Case where there are multiple non-mixing peers and possibly multiple mixing peers.
+            //     let requestMixingBody = { type: "requestMixingPeers" }
+            //     sendToAll(JSON.stringify(requestMixingBody))
+            //     let requestBody = { type: "requestNetworkNodes" }
+            //     sendToAll(JSON.stringify(requestBody))   
+            // }
+            updateGraph()
+        //}
     });
 
 }

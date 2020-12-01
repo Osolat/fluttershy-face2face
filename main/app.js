@@ -16,6 +16,9 @@ http.listen(port, () => {
     console.log(`Example app listening at http://localhost:${port}`);
 })
 
+
+const timesyncServer = require('timesync/server')
+
 const io = require('socket.io')(http);
 activeSockets = {};
 identificationMap = {};
@@ -91,6 +94,8 @@ app.use(express.json());
 app.use(express.urlencoded({extended: false}));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
+
+app.use('/timesync', timesyncServer.requestHandler);
 
 app.use('/', indexRouter);
 app.use('/users', usersRouter);

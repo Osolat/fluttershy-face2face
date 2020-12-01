@@ -14,6 +14,8 @@
     />
     <link rel="stylesheet" href="./stylesheets/style.css"/>
     <script src="./javascripts/room.js" type="module"></script>
+    <script src="/timesync/timesync.js"></script>
+    <script src="./javascripts/bundle.js"></script>
     <script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js"></script>
 </head>
@@ -62,8 +64,6 @@
 
 
                 <div id="VideoTab" class="tabcontent">
-                    <canvas id="mix-canvas"></canvas>
-
                 </div>
 
                 <div id="Document" class="tabcontent">
@@ -142,9 +142,9 @@
                 </div>
             </div>
             <div class="context-container">
-                <!--
+                
                                 <script src="./javascripts/filetransferHtmlWrite.js"></script>
-                -->
+
             </div>
         </div>
         <div class="text-chat-container">
@@ -163,11 +163,7 @@
     </div>
 </div>
 <div>
-    <form id="fileInfo">
-        <input type="file" id="fileInput" name="files"/>
-    </form>
-    <button disabled id="sendFile">Send</button>
-    <button disabled id="abortButton">Abort</button>
+
 </div>
 
 <script>

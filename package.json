@@ -4,7 +4,8 @@
   "description": "Peer-to-peer application for collaboration",
   "main": "index.js",
   "dependencies": {
-    "express": "^4.17.1"
+    "express": "^4.17.1",
+    "timesync": "^1.0.8"
   },
   "devDependencies": {},
   "scripts": {
