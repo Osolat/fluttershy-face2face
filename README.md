@@ -2,6 +2,10 @@
 This is a repository for the P2P course, which aims to implement WebRTC and some P2P architecture to create a collaborative video conference application.
 
 # Priority (main features)
+- Bug fixes
+    - Supreme leader leaves?
+    - Mixer leaves (does not delete correctly always?)
+    - When third mixer joins it doesnt always get a peer
 - Implement file sharing system
     - Display Shared files (immutable)
     - (Done) Download link shows up in chatlogs
