@@ -261,10 +261,14 @@ function removeUseFromNetworkSplit(socketId) {
             let danglingPeersArrayIsEmpty = false;
             while (!danglingPeersArrayIsEmpty) {
                 networkSplit[mixingPeers[mixerIndex]].push(networkSplit[sock].pop());
-                danglingPeersArrayIsEmpty = arr.length === 0;
+                danglingPeersArrayIsEmpty = networkSplit[sock].length === 0;
                 mixerIndex += (mixerIndex + 1) % mixingPeers.length;
             }
+            console.log("Blyat 1");
+            console.log(networkSplit);
             delete networkSplit[sock]
+            console.log("Blyat 2");
+            console.log(networkSplit);
             return;
         } else {
             const index = arr.indexOf(socketId);
@@ -623,7 +627,10 @@ function becomeMixer() {
     mixerMixedStream = canvasForMixers.captureStream(15);
     animationId = window.requestAnimationFrame(drawPeerCanvas)
     isMixingPeer = true;
+    console.log("become mixer 1: " + mixingPeers);
     mixingPeers.push(socket.id);
+    console.log("become mixer 2: " + mixingPeers);
+
     const localVideo = document.getElementById("local-video");
     window.localStream = peerMixedStream;
     outputNode = audioContext.createMediaStreamDestination();
@@ -808,6 +815,12 @@ async function pollMixerPerformance() {
             }
             mixingPeers.push(candidate);
             networkSplit[candidate] = [];
+            const index = peersToDistribute.indexOf(candidate);
+            if (index > -1) {
+                peersToDistribute.splice(index, 1);
+            } else {
+                console.log("Major failure, could not remove new mixer from peersToDistribute")
+            }
             console.log("PollMixerPerformance: mixingPeers = " + mixingPeers);
             console.log("PollMixerPerformance: peersToDistribute = " + peersToDistribute);
             peersToDistribute = peersToDistribute.filter(elem => elem !== candidate);
@@ -1215,6 +1228,7 @@ function onReceiveMessageCallback(event) {
             }
             break;
         case "mixerStatusResponse":
+            console.log("mixerStatusResponse mixers 1: " + mixingPeers);
             data.mixers.forEach(newMixer => {
                 if (!mixingPeers.includes(newMixer)) {
                     mixingPeers.push(newMixer)
@@ -1226,8 +1240,10 @@ function onReceiveMessageCallback(event) {
                     }
                 }
             })
+            console.log("mixerStatusResponse mixers 2: " + mixingPeers);
             break;
         case "mixerStatus":
+            console.log("mixerStatus mixers 1: " + mixingPeers);
             data.mixers.forEach(newMixer => {
                 if (!mixingPeers.includes(newMixer)) {
                     mixingPeers.push(newMixer)
@@ -1251,6 +1267,7 @@ function onReceiveMessageCallback(event) {
                 mixers: mixingPeers
             }
             dataChannels[data.origin].send(JSON.stringify(response))
+            console.log("mixerStatus mixers 2: " + mixingPeers);
             break;
         case "benchMarkResponse":
             console.log("Got a benchmark back from " + data.origin)
