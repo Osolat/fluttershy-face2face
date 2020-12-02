@@ -91,7 +91,7 @@ let peerElectionPoints = {};
 let electionInitiated = false;
 let electionNum = 0;
 let allowedSubNetworkSize = 2;
-let debugging = true;
+let debugging = false;
 let supremeMixerPeer;
 //const benchmarkSize = 1024 * 1024 * 4; // 4000kbytes = 4MB
 //const benchmarkSize = 1024 * 1024; // 1000kbytes = 1MB
@@ -143,6 +143,7 @@ function sendMetaData() {
 
 
 function drawPeerCanvas() {
+    if (requestAnimationPaused) return;
     drawPeerVideoStrip();
     // animation frame will be drop down, when window is hidden.
     window.requestAnimationFrame(drawPeerCanvas);
@@ -185,9 +186,8 @@ function drawVideoStripe(c, videoElement, index, memberSocket, videoSlots) {
     if (memberSocket === "-1") {
         c.fillText(nickName, destLeft + 2, destTop + 10);
     } else {
-        //TODO uncomment this
-        //c.fillText(RTCConnectionNames[memberSocket], destLeft + 2, destTop + 10);
-        c.fillText(memberSocket, destLeft + 2, destTop + 10);
+        c.fillText(RTCConnectionNames[memberSocket], destLeft + 2, destTop + 10);
+        //c.fillText(memberSocket, destLeft + 2, destTop + 10);
     }
 }
 
@@ -276,6 +276,42 @@ function removeUseFromNetworkSplit(socketId) {
     }
 }
 
+function resetEverythingElectionRelated() {
+    electionInitiated = false;
+    electionBenchMarksSent = false;
+    electionPointsReceived = {};
+    peerElectionPoints = {};
+    benchmarkBuffers = {};
+    frameEncodeTimes = {};
+    networkSplit = {};
+    bitRates = {};
+    lastResult = {};
+    mixingPeers = [];
+    isMixingPeer = false;
+    requestAnimationPaused = true;
+    peerElectionPoints[socket.id] = 0;
+    electionPointsReceived[socket.id] = false
+    for (const [sock, _] of Object.entries(RTCConnections)) {
+        electionPointsReceived[sock] = false;
+
+    }
+}
+
+function restoreNormalStreamsToEveryone() {
+    const localVideo = document.getElementById("local-video");
+    window.localStream = localVideo.srcObject;
+    for (const [sock, _] of Object.entries(RTCConnections)) {
+        let senders = RTCConnections[sock].getSenders();
+        for (let i = 0; i < senders.length; i++) {
+            if (senders[i].track.kind === "video") {
+                senders[i].replaceTrack(window.localStream.getVideoTracks()[0]).then(_ => console.log("Restarted a track during supreme leader loss"))
+            } else {
+                senders[i].replaceTrack(window.localStream.getAudioTracks()[0]).then(_ => console.log("Restarted a track during supreme leader loss"))
+            }
+        }
+    }
+}
+
 async function bootAndGetSocket() {
     await initLocalStream();
     // TODO: Handle different room IDs.
@@ -302,6 +338,12 @@ async function bootAndGetSocket() {
             activeConnectionSize--;
             delete RTCConnectionsCallStatus[socketId];
             delete RTCConnectionNames[socketId];
+            if (socketId === supremeMixerPeer) {
+                //The supremeMixer just left
+                //Reset everything, prompt for a new supreme mixer
+                resetEverythingElectionRelated();
+                restoreNormalStreamsToEveryone();
+            }
             if (supremeMixerPeer === socket.id) {
                 console.log("remove-user 1")
                 console.log(networkSplit)
@@ -366,16 +408,12 @@ async function bootAndGetSocket() {
                 filetransfer.configureChannel(dataChannel)
                 dataChannels[data.socket] = dataChannel
                 if (supremeMixerPeer === socket.id) {
-                    //TODO this needs to be updated. If supreme leader immediately sends out networksplit, maybe not all users initiated their handshake
-                    /*networkSplit[socket.id].push(data.socket);
+                    networkSplit[socket.id].push(data.socket);
                     sendToAll(JSON.stringify({
                         type: "networkSplit",
                         origin: socket.id,
                         networkData: networkSplit
-                    }))*/
-                    //TODO WIP fixing above
-                    // Supreme should request all others to acknowledge existance and valid RTC connect before he splits
-
+                    }))
                 }
             }
         }
@@ -411,7 +449,8 @@ function getOntrackFunction(socketId) {
         if (remoteVideo) {
             remoteVideo.srcObject = stream;
         }
-        if (isMixingPeer) {
+        // TODO might not be necessary?
+        /*if (isMixingPeer) {
             let micNode = audioContext.createMediaStreamSource(stream);
             micNodes[socketId] = micNode;
             for (const [sock, _] of Object.entries(RTCConnections)) {
@@ -419,7 +458,7 @@ function getOntrackFunction(socketId) {
                     micNode.connect(outputNodes[sock]);
                 }
             }
-        }
+        }*/
     };
 }
 
@@ -438,7 +477,11 @@ function initNewRTCConnection(socketId) {
     activeConnectionSize++;
 
     RTCConnectionsCallStatus[socketId] = false;
-    if (isMixingPeer) {
+    //TODO check if the commented stuff below is needed
+    // probably not, on connection we should just stream whatever.
+    // Correct mixing happens on updated networksplits
+    window.localStream.getTracks().forEach(track => rtcConnection.addTrack(track, window.localStream));
+    /*if (isMixingPeer) {
         if (mixingPeers.includes(socketId)) {
             mixerMixedStream.getTracks().forEach(track => {
                 if (track.kind === "video") {
@@ -456,19 +499,9 @@ function initNewRTCConnection(socketId) {
             });
             rtcConnection.addTrack(outputNodes[socketId].stream.getAudioTracks()[0], peerMixedStream);
         }
-    } else if (mixingPeers.length === 0) {
-        // If no mixing peers, we want to stream video to everyone
-        console.log("Fudge 1")
-        console.log(window.localStream.getTracks());
-        window.localStream.getTracks().forEach(track => rtcConnection.addTrack(track, window.localStream));
-    } else if (mixingPeers.includes(socketId)) {
-        console.log("Fudge 2")
-        console.log(window.localStream.getTracks());
-        // If there are mixing peers, we only want to stream video to the mixers
-        window.localStream.getTracks().forEach(track => rtcConnection.addTrack(track, window.localStream));
     } else {
         window.localStream.getTracks().forEach(track => rtcConnection.addTrack(track, window.localStream));
-    }
+    }*/
     //Reset animation background
     resetCanvases();
     // Some other init tied to the connection
@@ -629,7 +662,10 @@ async function benchMarkAllKnownPeers() {
     }
 }
 
+let requestAnimationPaused = true;
+
 function startCapturingToCanvas() {
+    requestAnimationPaused = false;
     peerMixedStream = canvasForPeers.captureStream(15);
     mixerMixedStream = canvasForMixers.captureStream(15);
     animationId = window.requestAnimationFrame(drawPeerCanvas)
@@ -829,7 +865,23 @@ async function pollMixerPerformance() {
             rebootStreamTargets();
         } else {
             // We simply need to redistribute
-            console.log("Should not be able to get down here - redistribute network")
+            console.log("Redistribute network, one mixer has a peer too many")
+            let peersToDistribute = Object.keys(RTCConnections);
+            peersToDistribute = peersToDistribute.filter(elem => !mixingPeers.includes(elem));
+            quotient = Math.floor(peersToDistribute.length / mixingPeers.length)
+            remainder = peersToDistribute.length % mixingPeers.length;
+            for (const [sock, _] of Object.entries(networkSplit)) {
+                networkSplit[sock] = [];
+                for (let i = 0; i < quotient; i++) {
+                    networkSplit[sock].push(peersToDistribute.pop());
+                }
+                if (remainder > 0) {
+                    remainder--;
+                    networkSplit[sock].push(peersToDistribute.pop());
+                }
+            }
+            sendNetworkSplit();
+            rebootStreamTargets();
         }
     }
 }
@@ -984,16 +1036,16 @@ function electMixers(mixerSpots) {
     console.log(candidates)
     let ranked = candidates.slice(0, mixerSpots);
     let electee = ranked[0][0];
-    mixingPeers.push(electee)
+    supremeMixerPeer = electee;
     if (electee === socket.id) {
         console.log("I became mixer")
         // We should only have one mixer at this point.
-        console.assert(mixingPeers.length === 1)
-        supremeMixerPeer = socket.id;
+        console.assert(mixingPeers.length === 0)
         networkSplit[socket.id] = Array.from(roomConnectionsSet);
         becomeMixer();
     } else {
-        pauseNonMixerStreams();
+        rebootStreamTargets();
+        mixingPeers.push(electee)
     }
 }
 
@@ -1126,6 +1178,7 @@ function onReceiveMessageCallback(event) {
         case "debugging":
             electionInitiated = true;
             electionBenchMarksSent = true;
+            supremeMixerPeer = data.origin;
             break;
         case "electionPoints":
             for (const [id, votes] of Object.entries(data.points)) {
@@ -1142,7 +1195,7 @@ function onReceiveMessageCallback(event) {
             postChatMessage(data.message, data.nickname)
             break;
         case "networkSplit":
-            console.log("In networkSplit")
+            console.log("In networkSplit from " + data.origin)
             console.log(data.networkData);
             for (const [id, _] of Object.entries(data.networkData)) {
                 console.log("Networksplit message: " + id + " mixes for " + data.networkData[id]);
