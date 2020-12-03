@@ -13,14 +13,14 @@ textInput.on("keypress", function (event) {
 //For mixing
 // let canvasForPeers = document.getElementById('mix-canvas');
 let canvasForPeers = document.createElement('canvas');
-canvasForPeers.width = 500;
-canvasForPeers.height = 400;
+canvasForPeers.width = 600;
+canvasForPeers.height = 600;
 let peerCanvasContext = canvasForPeers.getContext('2d');
 peerCanvasContext.fillStyle = 'rgb(128, 192, 128)';
 
 let canvasForMixers = document.createElement('canvas');
-canvasForMixers.width = 500;
-canvasForMixers.height = 400;
+canvasForMixers.width = 600;
+canvasForMixers.height = 600;
 let mixerCanvasContext = canvasForMixers.getContext('2d');
 mixerCanvasContext.fillStyle = 'rgb(128, 192, 128)';
 
@@ -91,7 +91,7 @@ let peerElectionPoints = {};
 let electionInitiated = false;
 let electionNum = 0;
 let allowedSubNetworkSize = 2;
-let debugging = false;
+let debugging = true;
 let supremeMixerPeer;
 //const benchmarkSize = 1024 * 1024 * 4; // 4000kbytes = 4MB
 //const benchmarkSize = 1024 * 1024; // 1000kbytes = 1MB
@@ -99,7 +99,6 @@ const benchmarkSize = 1024 * 512; // 512kbytes = 0.5mb
 
 const benchmarkPackSize = 1024 * 8 // 8 Kbytes
 const benchmarkPacketNums = (benchmarkSize) / (benchmarkPackSize)
-console.log(benchmarkPacketNums)
 
 // for timesync
 
@@ -149,6 +148,107 @@ function drawPeerCanvas() {
     window.requestAnimationFrame(drawPeerCanvas);
 }
 
+function drawCanvasForPeers() {
+    const videoslots = networkSplit[socket.id].length;
+    const amountUsersInCanvas = (videoslots + mixingPeers.length + 1);
+    const widthOfSmallFrames = canvasForPeers.width / amountUsersInCanvas;
+    const hRatio = (canvasForPeers.width / widestVid) * tallestVid;
+    const heightOfSmallFrames = hRatio / amountUsersInCanvas
+
+    let index = 1;
+    let fourMatrixSquareHeight = (canvasForPeers.height - heightOfSmallFrames) / 2;
+    let fourMatrixSquareWidth = hRatio / 2;
+    if (amountUsersInCanvas <= 4) {
+        fourMatrixSquareHeight = canvasForPeers.height / 2;
+    }
+    let localV = document.getElementById("local-video");
+    if (localV) {
+        peerCanvasContext.drawImage(localV, 0, 0, fourMatrixSquareWidth, fourMatrixSquareHeight);
+        peerCanvasContext.fillText(nickName, 2, 10);
+
+    }
+    for (var key in RTCConnections) {
+        let videoElement = document.getElementById(key);
+        if (videoElement && (networkSplit[socket.id].includes(key) || mixingPeers.includes(key))) {
+            let goalVideoWidth = canvasForMixers.width / 2;
+            let destLeft = widthOfSmallFrames * index;
+            let destTop = fourMatrixSquareHeight * 2;
+            if (videoElement.videoHeight > tallestVid) {
+                tallestVid = videoElement.videoHeight;
+            }
+            if (videoElement.videoWidth > widestVid) {
+                widestVid = videoElement.videoWidth;
+            }
+            if (index === 1) {
+                peerCanvasContext.drawImage(videoElement, fourMatrixSquareWidth, 0, fourMatrixSquareWidth, fourMatrixSquareHeight);
+                peerCanvasContext.fillText("1", fourMatrixSquareWidth + 2, 0 + 10);
+            } else if (index === 2) {
+                peerCanvasContext.drawImage(videoElement, 0, fourMatrixSquareHeight, fourMatrixSquareWidth, fourMatrixSquareHeight);
+                peerCanvasContext.fillText("2", 0 + 2, fourMatrixSquareHeight + 10);
+            } else if (index === 3) {
+                peerCanvasContext.drawImage(videoElement, fourMatrixSquareWidth, fourMatrixSquareHeight, fourMatrixSquareWidth, fourMatrixSquareHeight);
+                peerCanvasContext.fillText("3", fourMatrixSquareWidth + 2, fourMatrixSquareHeight + 10);
+            } else {
+                peerCanvasContext.drawImage(videoElement, destLeft, destTop, widthOfSmallFrames, heightOfSmallFrames);
+                peerCanvasContext.fillText(key, destLeft + 2, destTop + 10);
+            }
+            //c.fillText(memberSocket, destLeft + 2, destTop + 10);
+
+            index++;
+        }
+    }
+}
+
+function drawCanvasForMixers() {
+    const videoslots = networkSplit[socket.id].length;
+    const amountUsersInCanvas = (videoslots + 1);
+    const widthOfSmallFrames = canvasForMixers.width / amountUsersInCanvas;
+    const hRatio = (canvasForMixers.width / widestVid) * tallestVid;
+    const heightOfSmallFrames = hRatio / amountUsersInCanvas
+
+    let index = 1;
+    let fourMatrixSquareHeight = (canvasForMixers.height - heightOfSmallFrames) / 2;
+    let fourMatrixSquareWidth = hRatio / 2;
+    if (amountUsersInCanvas <= 4) {
+        fourMatrixSquareHeight = canvasForMixers.height / 2;
+    }
+    let localV = document.getElementById("local-video");
+    if (localV) {
+        mixerCanvasContext.drawImage(localV, 0, 0, fourMatrixSquareWidth, fourMatrixSquareHeight);
+        mixerCanvasContext.fillText(nickName, 2, 10);
+
+    }
+    for (var key in RTCConnections) {
+        let videoElement = document.getElementById(key);
+        if (videoElement && !mixingPeers.includes(key) && networkSplit[socket.id].includes(key)) {
+            let destLeft = widthOfSmallFrames * index;
+            let destTop = fourMatrixSquareHeight * 2;
+            if (videoElement.videoHeight > tallestVid) {
+                tallestVid = videoElement.videoHeight;
+            }
+            if (videoElement.videoWidth > widestVid) {
+                widestVid = videoElement.videoWidth;
+            }
+            if (index === 1) {
+                mixerCanvasContext.drawImage(videoElement, fourMatrixSquareWidth, 0, fourMatrixSquareWidth, fourMatrixSquareHeight);
+                mixerCanvasContext.fillText(key, fourMatrixSquareWidth + 2, 0 + 10);
+            } else if (index === 2) {
+                mixerCanvasContext.drawImage(videoElement, 0, fourMatrixSquareHeight, fourMatrixSquareWidth, fourMatrixSquareHeight);
+                mixerCanvasContext.fillText(key, 0 + 2, fourMatrixSquareHeight + 10);
+            } else if (index === 3) {
+                mixerCanvasContext.drawImage(videoElement, fourMatrixSquareWidth, fourMatrixSquareHeight, fourMatrixSquareWidth, fourMatrixSquareHeight);
+                mixerCanvasContext.fillText(key, fourMatrixSquareWidth + 2, fourMatrixSquareHeight + 10);
+            } else {
+                mixerCanvasContext.drawImage(videoElement, destLeft, destTop, widthOfSmallFrames, heightOfSmallFrames);
+                mixerCanvasContext.fillText(key, destLeft + 2, destTop + 10);
+            }
+            //c.fillText(memberSocket, destLeft + 2, destTop + 10);
+
+            index++;
+        }
+    }
+}
+
 function drawPeerVideoStrip() {
     let indexInMixerCanvas = 1;
     let indexInPeercanvas = 1;
@@ -156,19 +256,21 @@ function drawPeerVideoStrip() {
     const localVideo = document.getElementById("local-video");
     let remoteVid;
     let videoslots = networkSplit[socket.id].length;
-    drawVideoStripe(peerCanvasContext, localVideo, 0, "-1", videoslots + mixingPeers.length);
-    drawVideoStripe(mixerCanvasContext, localVideo, 0, "-1", videoslots);
-    for (var key in RTCConnections) {
+    //drawVideoStripe(peerCanvasContext, localVideo, 0, "-1", videoslots + mixingPeers.length);
+    //drawVideoStripe(mixerCanvasContext, localVideo, 0, "-1", videoslots);
+    drawCanvasForMixers()
+    drawCanvasForPeers();
+    /*for (var key in RTCConnections) {
         remoteVid = document.getElementById(key);
         if (remoteVid && !mixingPeers.includes(key) && networkSplit[socket.id].includes(key)) {
             drawVideoStripe(mixerCanvasContext, remoteVid, indexInMixerCanvas, key, videoslots);
             indexInMixerCanvas++;
         }
-        if (remoteVid && (networkSplit[socket.id].includes(key) || mixingPeers.includes(key))) {
+        /!*if (remoteVid && (networkSplit[socket.id].includes(key) || mixingPeers.includes(key))) {
             drawVideoStripe(peerCanvasContext, remoteVid, indexInPeercanvas, key, videoslots + mixingPeers.length);
             indexInPeercanvas++;
-        }
-    }
+        }*!/
+    }*/
 }
 
 function drawVideoStripe(c, videoElement, index, memberSocket, videoSlots) {
@@ -1067,12 +1169,13 @@ function handleTurningNonMixer() {
 
 function resetCanvases() {
     peerCanvasContext.beginPath();
-    peerCanvasContext.rect(0, 0, widestVid, tallestVid);
+    //TODO this was changed from "tallest vid"
+    peerCanvasContext.rect(0, 0, canvasForPeers.width, canvasForPeers.height);
     peerCanvasContext.fillStyle = "black";
     peerCanvasContext.fill();
 
     mixerCanvasContext.beginPath();
-    mixerCanvasContext.rect(0, 0, widestVid, tallestVid);
+    mixerCanvasContext.rect(0, 0, canvasForMixers.width, canvasForMixers.height);
     mixerCanvasContext.fillStyle = "black";
     mixerCanvasContext.fill();
 }
