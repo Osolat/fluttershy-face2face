@@ -57,8 +57,6 @@ let black = ({width = 1, height = 1} = {}) => {
 let blackSilence = (...args) => new MediaStream([black(...args), silence()]);
 let dummyAudioTrack = blackSilence().getAudioTracks()[0];
 let dummyVideoTrack = blackSilence().getVideoTracks()[0];
-console.log(dummyAudioTrack);
-console.log(dummyVideoTrack);
 /*let oscillatorDummy = audioContext.createOscillator();
 let dummyDest = oscillatorDummy.connect(audioContext.createMediaStreamDestination());
 oscillatorDummy.start();
@@ -744,13 +742,13 @@ function pauseNonMixerStreams() {
         if (!mixingPeers.includes(sock)) {
             let senders = RTCConnections[sock].getSenders();
             console.assert(senders.length === 2);
-            console.assert(dummyAudioStream.getAudioTracks()[0].kind === "audio")
-            console.assert(dummyVideoStream.getVideoTracks()[0].kind === "video")
+            console.assert(dummyAudioTrack.kind === "audio")
+            console.assert(dummyVideoTrack.kind === "video")
             for (let i = 0; i < senders.length; i++) {
                 if (senders[i].track.kind === "audio") {
-                    senders[i].replaceTrack(dummyAudioStream.getAudioTracks()[0]).then(_ => console.log("Replaced with dummy audio track"))
+                    senders[i].replaceTrack(dummyAudioTrack).then(_ => console.log("Replaced with dummy audio track"))
                 } else if (senders[i].track.kind === "video") {
-                    senders[i].replaceTrack(dummyVideoStream.getVideoTracks()[0]).then(_ => console.log("Replaced with dummy video track"))
+                    senders[i].replaceTrack(dummyVideoTrack).then(_ => console.log("Replaced with dummy video track"))
                 }
             }
         }
@@ -933,9 +931,9 @@ async function forceElection() {
 }
 
 async function bitRateEveryone() {
-    if (debugging) return;
     for (const [sock, _] of Object.entries(RTCConnections)) {
         bitRateBenchMark(sock);
+        if (debugging) continue;
         await evaluateElectionNeed(sock);
     }
 }
@@ -1063,7 +1061,9 @@ function bitRateBenchMark(socketID) {
                         deltaT;
                     //const headerrate = 8 * (headerBytes - lastResult[socketID].get(report.id).headerBytesSent) /
                     //    deltaT;
+                    console.log("bitrates to " + socketID + ": " + bitrate)
                     bitRates[socketID].push(bitrate);
+                    console.log("frameencode to " + socketID + ": " + avgFrameEncodeTimeSinceLast)
                     frameEncodeTimes[socketID].push(avgFrameEncodeTimeSinceLast);
                 }
             }
@@ -1290,9 +1290,9 @@ async function updateTracksAsMixer() {
                 }
             } else {
                 if (senders[i].track.kind === "audio") {
-                    senders[i].replaceTrack(dummyAudioStream.getAudioTracks()[0]).then(_ => console.log("Replaced with dummy audio track"))
+                    senders[i].replaceTrack(dummyAudioTrack).then(_ => console.log("Replaced with dummy audio track"))
                 } else if (senders[i].track.kind === "video") {
-                    senders[i].replaceTrack(dummyVideoStream.getVideoTracks()[0]).then(_ => console.log("Replaced with dummy video track"))
+                    senders[i].replaceTrack(dummyVideoTrack).then(_ => console.log("Replaced with dummy video track"))
                 }
             }
         }
@@ -1318,12 +1318,8 @@ async function rebootStreamTargets() {
                     }
                     console.assert(tracks[i] !== null);
                     if (senders[i].track.kind === "audio") {
-                        console.log("AUDIO: " + sock)
-                        console.log(outputNodes[sock]);
                         outputNodes[sock] = audioContext.createMediaStreamDestination();
-                        console.log(outputNodes[sock]);
                         myMicNode.connect(outputNodes[sock]);
-                        console.log(outputNodes[sock]);
                         senders[i].replaceTrack(outputNodes[sock].stream.getAudioTracks()[0]).then(_ => console.log("Restarted an audio track to" + myMixer))
                     } else {
                         senders[i].replaceTrack(window.localStream.getVideoTracks()[0]).then(_ => console.log("Restarted a video track to " + myMixer))
@@ -1333,8 +1329,6 @@ async function rebootStreamTargets() {
             }
         }
         console.assert(myMixer !== undefined);
-        console.assert(dummyAudioStream.getAudioTracks()[0].kind === "audio")
-        console.assert(dummyVideoStream.getVideoTracks()[0].kind === "video")
         for (const [sock, _] of Object.entries(RTCConnections)) {
             if (sock !== myMixer) {
                 let senders = RTCConnections[sock].getSenders();
@@ -1352,14 +1346,9 @@ async function rebootStreamTargets() {
                         console.log(senders[i]);
                     }
                     if (senders[i].track.kind === "audio") {
-                        console.log("HURRICANE")
-                        console.log(outputNodes[sock]);
-                        console.log(dummyAudioStream.getAudioTracks()[0]);
-                        console.log(senders[i].track);
-                        senders[i].replaceTrack(dummyAudioStream.getAudioTracks()[0]).then(_ => console.log("Replaced dummy audio track to " + sock))
-                        console.log(senders[i].track);
+                        senders[i].replaceTrack(dummyAudioTrack).then(_ => console.log("Replaced dummy audio track to " + sock))
                     } else if (senders[i].track.kind === "video") {
-                        senders[i].replaceTrack(dummyVideoStream.getVideoTracks()[0]).then(_ => console.log("Replaced dummy video track to " + sock))
+                        senders[i].replaceTrack(dummyVideoTrack).then(_ => console.log("Replaced dummy video track to " + sock))
                     }
                 }
             }
