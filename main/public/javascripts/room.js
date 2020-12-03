@@ -39,8 +39,31 @@ let animationId = null;
 // for audio
 let audioContext = new window.AudioContext();
 audioContext.resume();
-let dummyAudioStream = audioContext.createMediaStreamDestination().stream;
-let dummyVideoStream = dummmyCanvas.captureStream();
+
+let silence = () => {
+    let oscillator = audioContext.createOscillator();
+    let dst = oscillator.connect(audioContext.createMediaStreamDestination());
+    oscillator.start();
+    return Object.assign(dst.stream.getAudioTracks()[0], {enabled: false});
+}
+
+let black = ({width = 1, height = 1} = {}) => {
+    let canvas = Object.assign(document.createElement("canvas"), {width, height});
+    canvas.getContext('2d').fillRect(0, 0, width, height);
+    let stream = canvas.captureStream();
+    return Object.assign(stream.getVideoTracks()[0], {enabled: false});
+}
+
+let blackSilence = (...args) => new MediaStream([black(...args), silence()]);
+let dummyAudioTrack = blackSilence().getAudioTracks()[0];
+let dummyVideoTrack = blackSilence().getVideoTracks()[0];
+console.log(dummyAudioTrack);
+console.log(dummyVideoTrack);
+/*let oscillatorDummy = audioContext.createOscillator();
+let dummyDest = oscillatorDummy.connect(audioContext.createMediaStreamDestination());
+oscillatorDummy.start();
+let dummyAudioStream = dummyDest.stream;
+let dummyVideoStream = dummmyCanvas.captureStream();*/
 
 let micNodes = [];
 let outputNodes = [];
@@ -93,6 +116,9 @@ let electionNum = 0;
 let allowedSubNetworkSize = 2;
 let debugging = true;
 let supremeMixerPeer;
+let myMicNode;
+let myMicNode2;
+
 //const benchmarkSize = 1024 * 1024 * 4; // 4000kbytes = 4MB
 //const benchmarkSize = 1024 * 1024; // 1000kbytes = 1MB
 const benchmarkSize = 1024 * 512; // 512kbytes = 0.5mb
@@ -250,12 +276,12 @@ function drawCanvasForMixers() {
 }
 
 function drawPeerVideoStrip() {
-    let indexInMixerCanvas = 1;
-    let indexInPeercanvas = 1;
+    /*  let indexInMixerCanvas = 1;
+      let indexInPeercanvas = 1;
+      const localVideo = document.getElementById("local-video");
+      let remoteVid;
+      let videoslots = networkSplit[socket.id].length;*/
     resetCanvases();
-    const localVideo = document.getElementById("local-video");
-    let remoteVid;
-    let videoslots = networkSplit[socket.id].length;
     //drawVideoStripe(peerCanvasContext, localVideo, 0, "-1", videoslots + mixingPeers.length);
     //drawVideoStripe(mixerCanvasContext, localVideo, 0, "-1", videoslots);
     drawCanvasForMixers()
@@ -566,23 +592,29 @@ function getOntrackFunction(socketId) {
 
 function initNewRTCConnection(socketId) {
     let rtcConnection = new RTCPeerConnection();
-    if (isMixingPeer) {
-        outputNodes[socketId] = audioContext.createMediaStreamDestination();
-        for (const [sock, _] of Object.entries(RTCConnections)) {
-            if (sock !== socketId) {
-                micNodes[sock].connect(outputNodes[socketId]);
-            }
-        }
-    }
+    //TODO might not be necessary
+    /*  if (isMixingPeer) {
+          outputNodes[socketId] = audioContext.createMediaStreamDestination();
+          for (const [sock, _] of Object.entries(RTCConnections)) {
+              if (sock !== socketId) {
+                  micNodes[sock].connect(outputNodes[socketId]);
+              }
+          }
+      }*/
+
     rtcConnection.ontrack = getOntrackFunction(socketId);
     RTCConnections[socketId] = rtcConnection;
     activeConnectionSize++;
-
     RTCConnectionsCallStatus[socketId] = false;
+    outputNodes[socketId] = audioContext.createMediaStreamDestination();
+    myMicNode.connect(outputNodes[socketId]);
+    rtcConnection.addTrack(outputNodes[socketId].stream.getAudioTracks()[0], window.localStream);
+    rtcConnection.addTrack(window.localStream.getVideoTracks()[0], window.localStream);
+
     //TODO check if the commented stuff below is needed
     // probably not, on connection we should just stream whatever.
     // Correct mixing happens on updated networksplits
-    window.localStream.getTracks().forEach(track => rtcConnection.addTrack(track, window.localStream));
+    //window.localStream.getTracks().forEach(track => rtcConnection.addTrack(track, window.localStream));
     /*if (isMixingPeer) {
         if (mixingPeers.includes(socketId)) {
             mixerMixedStream.getTracks().forEach(track => {
@@ -742,8 +774,12 @@ function gotStream(stream) {
     const localVideo = document.getElementById("local-video");
     localVideo.srcObject = stream;
     window.localStream = stream;
+    console.log(stream.getTracks());
     audioContext.resume();
-    if (isMixingPeer) {
+    myMicNode = audioContext.createMediaStreamSource(localVideo.srcObject);
+
+    //TODO might not be necessary
+    /*if (isMixingPeer) {
         outputNode = audioContext.createMediaStreamDestination();
         outputNodes[socket.id] = outputNode;
         audioMixStream = outputNode.stream;
@@ -755,7 +791,7 @@ function gotStream(stream) {
     } else {
         const audioTrack = stream.getAudioTracks()[0];
         window.localStream.addTrack(audioTrack)
-    }
+    }*/
 }
 
 async function benchMarkAllKnownPeers() {
@@ -776,12 +812,13 @@ function startCapturingToCanvas() {
 function initVideoAndAudioNodesAsMixer() {
     const localVideo = document.getElementById("local-video");
     window.localStream = peerMixedStream;
-    outputNode = audioContext.createMediaStreamDestination();
-    audioMixStream = outputNode.stream;
-    let myMicNode = audioContext.createMediaStreamSource(localVideo.srcObject);
-    myMicNode.connect(outputNode)
-    window.localStream.addTrack(audioMixStream.getAudioTracks()[0])
-    let tracks = window.localStream.getTracks();
+    //outputNode = audioContext.createMediaStreamDestination();
+    //audioMixStream = outputNode.stream;
+    //myMicNode = audioContext.createMediaStreamSource(localVideo.srcObject);
+    //myMicNode.connect(outputNode)
+    //window.localStream.addTrack(audioMixStream.getAudioTracks()[0])
+    //TODO might be unecessary
+    /*let tracks = window.localStream.getTracks();
     for (const [sock, _] of Object.entries(RTCConnections)) {
         const remoteVideo = document.getElementById(sock);
         if (remoteVideo) {
@@ -800,7 +837,7 @@ function initVideoAndAudioNodesAsMixer() {
                 micNodes[peer].connect(outputNodes[sock]);
             }
         }
-    }
+    }*/
 }
 
 function becomeMixer() {
@@ -1180,10 +1217,53 @@ function resetCanvases() {
     mixerCanvasContext.fill();
 }
 
+function resetAudioNodes() {
+    for (const [sock, _] of Object.entries(RTCConnections)) {
+        //Create micnodes for each valid client
+        if (mixingPeers.includes(sock) || networkSplit[socket.id].includes(sock)) {
+            //'sock' is a mixer, or one of my mixee peers.
+            const remoteVideo = document.getElementById(sock);
+            if (remoteVideo) {
+                micNodes[sock] = audioContext.createMediaStreamSource(remoteVideo.srcObject);
+                console.log(micNodes[sock]);
+            }
+        }
+    }
+    for (const [sock, _] of Object.entries(RTCConnections)) {
+        //Reset outputnode
+        outputNodes[sock] = audioContext.createMediaStreamDestination();
+        //Connect myself to output
+        myMicNode.connect(outputNodes[sock]);
+        //Create outputnodes for each valid client
+        if (mixingPeers.includes(sock)) {
+            //'sock' is a mixer
+            for (const [otherSock, _] of Object.entries(RTCConnections)) {
+                if (otherSock === sock) continue;
+                if (networkSplit[socket.id].includes(otherSock)) {
+                    //Othersock is one of my peers. I want to send the other mixer their audio. So I connect their audio to the output node.
+                    micNodes[otherSock].connect(outputNodes[sock]);
+                }
+            }
+        } else if (networkSplit[socket.id].includes(sock)) {
+            //'sock' is one of my mixee peers.
+            for (const [otherSock, _] of Object.entries(RTCConnections)) {
+                if (otherSock === sock) continue;
+                if (networkSplit[socket.id].includes(otherSock) || mixingPeers.includes(otherSock)) {
+                    //Othersock is one of my peers or a mixer. I want to send the peer their audio. So I connect their audio to the output node.
+                    micNodes[otherSock].connect(outputNodes[sock]);
+                }
+            }
+        }
+    }
+}
+
 async function updateTracksAsMixer() {
     let myPeers = networkSplit[socket.id];
     let otherMixers = Object.keys(networkSplit);
+    resetAudioNodes();
     for (const [sock, _] of Object.entries(RTCConnections)) {
+        console.log("Outputnode for " + sock);
+        console.log(outputNodes[sock])
         let senders = RTCConnections[sock].getSenders();
         console.assert(senders.length === 2);
         for (let i = 0; i < senders.length; i++) {
@@ -1202,6 +1282,7 @@ async function updateTracksAsMixer() {
                 }
             } else if (myPeers.includes(sock)) {
                 if (senders[i].track.kind === "audio") {
+                    console.log("AUDIO fug: " + outputNodes[sock])
                     senders[i].replaceTrack(outputNodes[sock].stream.getAudioTracks()[0]).then(_ => "Replaced track");
                 } else if (senders[i].track.kind === "video") {
                     console.assert(peerMixedStream.getVideoTracks()[0] !== null)
@@ -1228,6 +1309,7 @@ async function rebootStreamTargets() {
                 //Send actual video to mixer
                 let tracks = window.localStream.getTracks();
                 let senders = RTCConnections[sock].getSenders();
+                console.assert(senders.length === 2);
                 for (let i = 0; i < senders.length; i++) {
                     if (senders[i].track === null) {
                         console.log("Error, rebootStreamTargets, some track is null. Will recursively retry: " + sock)
@@ -1235,7 +1317,18 @@ async function rebootStreamTargets() {
                         return;
                     }
                     console.assert(tracks[i] !== null);
-                    senders[i].replaceTrack(tracks[i]).then(_ => console.log("Restarted a track"))
+                    if (senders[i].track.kind === "audio") {
+                        console.log("AUDIO: " + sock)
+                        console.log(outputNodes[sock]);
+                        outputNodes[sock] = audioContext.createMediaStreamDestination();
+                        console.log(outputNodes[sock]);
+                        myMicNode.connect(outputNodes[sock]);
+                        console.log(outputNodes[sock]);
+                        senders[i].replaceTrack(outputNodes[sock].stream.getAudioTracks()[0]).then(_ => console.log("Restarted an audio track to" + myMixer))
+                    } else {
+                        senders[i].replaceTrack(window.localStream.getVideoTracks()[0]).then(_ => console.log("Restarted a video track to " + myMixer))
+                    }
+                    //senders[i].replaceTrack(tracks[i]).then(_ => console.log("Restarted a track"))
                 }
             }
         }
@@ -1259,9 +1352,14 @@ async function rebootStreamTargets() {
                         console.log(senders[i]);
                     }
                     if (senders[i].track.kind === "audio") {
-                        senders[i].replaceTrack(dummyAudioStream.getAudioTracks()[0]).then(_ => console.log("Replaced with dummy audio track"))
+                        console.log("HURRICANE")
+                        console.log(outputNodes[sock]);
+                        console.log(dummyAudioStream.getAudioTracks()[0]);
+                        console.log(senders[i].track);
+                        senders[i].replaceTrack(dummyAudioStream.getAudioTracks()[0]).then(_ => console.log("Replaced dummy audio track to " + sock))
+                        console.log(senders[i].track);
                     } else if (senders[i].track.kind === "video") {
-                        senders[i].replaceTrack(dummyVideoStream.getVideoTracks()[0]).then(_ => console.log("Replaced with dummy video track"))
+                        senders[i].replaceTrack(dummyVideoStream.getVideoTracks()[0]).then(_ => console.log("Replaced dummy video track to " + sock))
                     }
                 }
             }
