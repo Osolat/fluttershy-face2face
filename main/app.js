@@ -87,6 +87,11 @@ io.on("connection", socket => {
                 answer: data.answer
             });
         });
+        socket.on("call-me", data => {
+            socket.to(data.to).emit("call-order", {
+                socket: socket.id,
+            });
+        });
     }
 });
 

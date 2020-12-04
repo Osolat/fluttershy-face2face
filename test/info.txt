@@ -12,5 +12,13 @@ docker run -it --rm  -v /var/run/docker.sock:/var/run/docker.sock pumba kill re2
 
 #Run 5 docker containters containing "tests.js" in the background. console output for puppet i will be logged in puppet-i-log
 for i in `seq 1 5`; \
-do (docker run -i --init --rm --cap-add=SYS_ADMIN  --network="host"  --name puppet_$i puppeteer-chrome-linux    node -e "`cat tests.js`" --unhandled-rejections=strict > test-logs/puppet-$i-log &)  ; \
+do (docker run -i --init --rm --cap-add=SYS_ADMIN  --network="host"  --name puppet_$i puppeteer-chrome-linux    node -e "`cat tests.js`" --unhandled-rejections=strict  > test-logs/puppet-$i-log &)  ; \
 done
+
+for i in `seq 1 5`; \
+do (  \
+docker run -i --init --rm --cap-add=SYS_ADMIN  --network="host"  --name puppet_$i puppeteer-chrome-linux    node -e "`cat tests.js`" --unhandled-rejections=strict > test-logs/puppet-$i-log &)  ; \
+timeout 1 > NUL; \
+done
+
+docker run -i --init --rm --cap-add=SYS_ADMIN  --network="host"  --name puppet_16 puppeteer-chrome-linux    node -e "`cat tests.js`" --unhandled-rejections=strict > test-logs/puppet-16-log &
