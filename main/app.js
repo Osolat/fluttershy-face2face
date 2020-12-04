@@ -60,13 +60,15 @@ io.on("connection", socket => {
                 socket.to(roomID).emit("latest-names", JSON.stringify(identificationMap));
             }
         )
+        socket.on("disconnecting", () => {
+            socket.to(roomID).emit("remove-user", {
+                socketId: socket.id
+            });
+        })
         socket.on("disconnect", () => {
             activeSockets[roomID] = activeSockets[roomID].filter(
                 existingSocket => existingSocket !== socket.id
             );
-            socket.to(roomID).emit("remove-user", {
-                socketId: socket.id
-            });
         });
         socket.emit("update-user-list", {
             users: activeSockets[roomID].filter(

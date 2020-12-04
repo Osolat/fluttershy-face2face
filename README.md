@@ -10,7 +10,6 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
     - Pumpa testing environment set-up and ready    
     - Drawing graph error:
         - Mixer elected by supreme is bugged visually
-    - Audio mixing
     - Prettier mixer visualisation    
     - Supreme leader leaves
         - Works, but need to find bugs

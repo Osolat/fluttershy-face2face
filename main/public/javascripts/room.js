@@ -490,15 +490,14 @@ async function bootAndGetSocket() {
         console.log("Latest names")
     });
 
-    socket.on("remove-user", ({ socketId }) => {
-        //console.log("remove-user 0")
-        //console.log(networkSplit)
+    socket.on("remove-user", ({socketId}) => {
+        console.log("remove-user 0")
         const elToRemove = document.getElementById(socketId);
         if (elToRemove) {
-            RTCConnections[socketId].close()
-            dataChannels[socketId].close()
-            delete dataChannels[socketId]
+            dataChannels[socketId].close();
+            RTCConnections[socketId].close();
             delete RTCConnections[socketId];
+            delete dataChannels[socketId];
             delete electionPointsReceived[socketId];
             activeConnectionSize--;
             delete RTCConnectionsCallStatus[socketId];
@@ -506,6 +505,7 @@ async function bootAndGetSocket() {
             if (socketId === supremeMixerPeer) {
                 //The supremeMixer just left
                 //Reset everything, prompt for a new supreme mixer
+                console.log("Supreme left")
                 resetEverythingElectionRelated();
                 restoreNormalStreamsToEveryone();
             }
@@ -993,10 +993,6 @@ function sendNetworkSplit() {
 }
 
 async function pollMixerPerformance() {
-    console.log("I am supreme")
-    console.log(supremeMixerPeer)
-    console.log(supremeMixerPeer !== socket.id)
-    console.log(socket.id)
     if (supremeMixerPeer !== socket.id) return;
     let newSplitWanted = false
     for (const [sock, _] of Object.entries(networkSplit)) {
@@ -1110,9 +1106,9 @@ function bitRateBenchMark(socketID) {
                         deltaT;
                     //const headerrate = 8 * (headerBytes - lastResult[socketID].get(report.id).headerBytesSent) /
                     //    deltaT;
-                    console.log("bitrates to " + socketID + ": " + bitrate)
+                    //console.log("bitrates to " + socketID + ": " + bitrate)
                     bitRates[socketID].push(bitrate);
-                    console.log("frameencode to " + socketID + ": " + avgFrameEncodeTimeSinceLast)
+                    //console.log("frameencode to " + socketID + ": " + avgFrameEncodeTimeSinceLast)
                     frameEncodeTimes[socketID].push(avgFrameEncodeTimeSinceLast);
                 }
             }
