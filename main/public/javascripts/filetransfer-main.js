@@ -43,8 +43,6 @@ abortButton.addEventListener('click', () => {
 });
 
 
-
-
 async function handleFileInputChange(event) {
     const file = fileInput.files[0]
     if (!file) {
@@ -64,22 +62,21 @@ async function createChannels(...localConnections) {
     await dataChannels.forEach(configureChannel)
 }
 
-function createChannel(connection) {
+function createChannel(connection, id) {
     let channel = connection.createDataChannel('sendDataChannel');
     console.log("Channel in create: " + channel)
     channel.addEventListener('open', onSendChannelStateChange(channel));
     channel.addEventListener('close', onSendChannelStateChange(channel));
-    channel.addEventListener('error', error => console.error('Error in sendChannel:', error));
+    channel.addEventListener('error', error => console.error('Error in sendChannel to: ' + id, error));
     return channel
 }
 
-async function configureChannel(dataChannel) {
+async function configureChannel(dataChannel, id) {
     dataChannel.binaryType = 'arraybuffer'
     dataChannel.addEventListener('open', onSendChannelStateChange(dataChannel));
     dataChannel.addEventListener('close', onSendChannelStateChange(dataChannel));
     dataChannel.addEventListener('error', error => console.error('Error in sendChannel:', error));
 }
-
 
 
 function encode(buf) {
@@ -102,7 +99,7 @@ function makeDownloadLink(received, metadata, sender) {
     var formattedTime = h + ':' + m + ':' + s + "  ";
     const chatEntryItem = document.createElement("li");
     chatEntryItem.innerHTML = '<p class="timestamp-chat">' + formattedTime + '(' + sender + ') ' +
-        '<a href='+ URL.createObjectURL(received) + ' download='+ metadata.name + '>'+'<span class="chat-message">' + metadata.name + '</span>' + '</a>' + '</p>'
+        '<a href=' + URL.createObjectURL(received) + ' download=' + metadata.name + '>' + '<span class="chat-message">' + metadata.name + '</span>' + '</a>' + '</p>'
     console.log(chatEntryItem.innerHTML)
     const chatloglist = document.getElementById("chat-log-list");
     if (chatloglist) {
@@ -113,6 +110,7 @@ function makeDownloadLink(received, metadata, sender) {
 function byteCount(s) {
     return encodeURI(s).split(/%..|./).length - 1;
 }
+
 function sendData(sendChannels, hash, sender) {
     const file = fileInput.files[0];
     console.log(`File is ${[file.name, file.size, file.type, file.lastModified].join(' ')}`);
@@ -143,7 +141,8 @@ function sendData(sendChannels, hash, sender) {
             })
             for (const [_, dc] of Object.entries(sendChannels)) {
                 dc.send(JSONdata)
-            };
+            }
+            ;
             offset += buffer.byteLength;
             sendProgress.value = offset;
             if (offset < file.size) {
@@ -166,14 +165,15 @@ function sendData(sendChannels, hash, sender) {
     };
     readSlice(0);
 }
+
 function fileEmpty() {
-  const file = fileInput.files[0];
-  if (file.size === 0) {
-    bitrateDiv.innerHTML = '';
-    statusMessage.textContent = 'File is empty, please select a non-empty file';
-    return true;
-  }
-  return false
+    const file = fileInput.files[0];
+    if (file.size === 0) {
+        bitrateDiv.innerHTML = '';
+        statusMessage.textContent = 'File is empty, please select a non-empty file';
+        return true;
+    }
+    return false
 }
 
 function closeDataChannels() {

@@ -456,10 +456,12 @@ async function bootAndGetSocket() {
 
     socket.on("remove-user", ({socketId}) => {
         console.log("remove-user 0")
-        console.log(networkSplit)
         const elToRemove = document.getElementById(socketId);
         if (elToRemove) {
+            dataChannels[socketId].close();
+            RTCConnections[socketId].close();
             delete RTCConnections[socketId];
+            delete dataChannels[socketId];
             delete electionPointsReceived[socketId];
             activeConnectionSize--;
             delete RTCConnectionsCallStatus[socketId];
@@ -492,7 +494,7 @@ async function bootAndGetSocket() {
             new RTCSessionDescription(data.answer)
         );
         if (!dataChannels[data.socket]) {
-            let newChannel = filetransfer.createChannel(RTCConnections[data.socket])
+            let newChannel = filetransfer.createChannel(RTCConnections[data.socket], data.socket)
             newChannel.onmessage = onReceiveMessageCallback
             dataChannels[data.socket] = newChannel;
         }
@@ -519,7 +521,7 @@ async function bootAndGetSocket() {
                 dataChannels[data.socket] = dataChannel
                 if (supremeMixerPeer === socket.id) {
                     networkSplit[socket.id].push(data.socket);
-                    dataChannels[data.socket].send(JSON.stringify({
+                    sendToAll(JSON.stringify({
                         type: "networkSplit",
                         origin: socket.id,
                         networkData: networkSplit
@@ -952,7 +954,7 @@ function sendNetworkSplit() {
 }
 
 async function pollMixerPerformance() {
-    if (!supremeMixerPeer === socket.id) return;
+    if (supremeMixerPeer !== socket.id) return;
     let newSplitWanted = false
     for (const [sock, _] of Object.entries(networkSplit)) {
         if (networkSplit[sock].length > allowedSubNetworkSize) newSplitWanted = true;
@@ -1061,9 +1063,9 @@ function bitRateBenchMark(socketID) {
                         deltaT;
                     //const headerrate = 8 * (headerBytes - lastResult[socketID].get(report.id).headerBytesSent) /
                     //    deltaT;
-                    console.log("bitrates to " + socketID + ": " + bitrate)
+                    //console.log("bitrates to " + socketID + ": " + bitrate)
                     bitRates[socketID].push(bitrate);
-                    console.log("frameencode to " + socketID + ": " + avgFrameEncodeTimeSinceLast)
+                    //console.log("frameencode to " + socketID + ": " + avgFrameEncodeTimeSinceLast)
                     frameEncodeTimes[socketID].push(avgFrameEncodeTimeSinceLast);
                 }
             }
