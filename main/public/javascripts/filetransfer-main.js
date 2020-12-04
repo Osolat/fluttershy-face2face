@@ -64,20 +64,20 @@ async function createChannels(...localConnections) {
     await dataChannels.forEach(configureChannel)
 }
 
-function createChannel(connection) {
+function createChannel(connection, id) {
     let channel = connection.createDataChannel('sendDataChannel');
     console.log("Channel in create: " + channel)
     channel.addEventListener('open', onSendChannelStateChange(channel));
     channel.addEventListener('close', onSendChannelStateChange(channel));
-    channel.addEventListener('error', error => console.error('Error in sendChannel:', error));
+    channel.addEventListener('error', error => console.error('Error in sendChannel:' + id, error));
     return channel
 }
 
-async function configureChannel(dataChannel) {
+async function configureChannel(dataChannel, id) {
     dataChannel.binaryType = 'arraybuffer'
     dataChannel.addEventListener('open', onSendChannelStateChange(dataChannel));
     dataChannel.addEventListener('close', onSendChannelStateChange(dataChannel));
-    dataChannel.addEventListener('error', error => console.error('Error in sendChannel:', error));
+    dataChannel.addEventListener('error', error => console.error('Error in sendChannel:' + id, error));
 }
 
 

@@ -2,10 +2,19 @@
 This is a repository for the P2P course, which aims to implement WebRTC and some P2P architecture to create a collaborative video conference application.
 
 # Priority (main features)
-- Bug fixes
-    - Supreme leader leaves?
-    - Mixer leaves (does not delete correctly always?)
-    - When third mixer joins it doesnt always get a peer
+- MUST BE FIXED IMMEDIATELY
+    - General connection stability
+        - Error on joining with several peers in room
+        - Error in both chrome/firefox
+            - Maybe because of STUN server, who knows. 
+    - Pumpa testing environment set-up and ready    
+    - Drawing graph error:
+        - Mixer elected by supreme is bugged visually
+    - Audio mixing
+    - Prettier mixer visualisation    
+    - Supreme leader leaves
+        - Works, but need to find bugs
+    
 - Implement file sharing system
     - Display Shared files (immutable)
     - (Done) Download link shows up in chatlogs
@@ -14,12 +23,13 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
     - Mixing peer nodes should be from mixingPeers (array)
     
 - Support new p2p topologies 
-    - Mixer election protocol (multiple mixers)   
+    - Mixer election protocol (multiple mixers)  
+     
 - Set up Pumba testing environment
 
-- Use auto-merge library to have collabarative text editing
 
 # Nice-to-have
+- Use auto-merge library to have collabarative text editing
 - Implement https
     - Needs certificate to function, only possible when server is live
     - Test system with multiple users    

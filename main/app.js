@@ -28,6 +28,9 @@ io.on("connection", socket => {
     if (!activeSockets.hasOwnProperty(roomID)) {
         activeSockets[roomID] = []
     }
+    console.log("app.js roomID")
+    console.log(roomID)
+    console.log(activeSockets[roomID])
     const existingSocket = activeSockets[roomID].find(
         existingSocket => existingSocket === socket.id
     );
