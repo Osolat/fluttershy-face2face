@@ -256,28 +256,10 @@ body {
     position: relative;
 }
 
-<<<<<<< HEAD
 #VideoTab {background-color: #65A9E5;}
 #Document {background-color: white;}
 #HomeworkTODO {background-color: white;}
 #NetworkTab {background-color: white;}
-=======
-#VideoTab {
-    background-color: #65A9E5;
-}
-
-#Document {
-    background-color: white;
-}
-
-#HomeworkTODO {
-    background-color: white;
-}
-
-#Settings {
-    background-color: white;
-}
->>>>>>> b1afce1986366135fc18adf3dc44a289129efad9
 
 .tabcontent {
     color: black;
@@ -285,7 +267,6 @@ body {
     padding: 5px 20px;
     height: 98%;
     white-space: initial
-<<<<<<< HEAD
   }
 
   .plot {
@@ -294,6 +275,3 @@ body {
     margin: 0;
     padding: 0;
   }
-=======
-}
->>>>>>> b1afce1986366135fc18adf3dc44a289129efad9
