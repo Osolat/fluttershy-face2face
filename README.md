@@ -25,7 +25,25 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
     - Mixer election protocol (multiple mixers)  
      
 - Set up Pumba testing environment
-
+# Testing
+- Latency test for audio
+    - Scenario 1
+        - 2 mixers
+        - 2 clients
+        - Send sound from client 1, register timestamp
+        - Register when client 2 receives sound, timestamp
+        - latency?
+    - Scenario 2
+        - 1 mixer
+        - 2 clients
+        - Same
+    - Scenario 3
+        - 0 mixers
+        - 2 clients
+    - Scenario 4,5,6
+        - 3 mixers, 4 mixers, 5 mixers
+        - 2 clients
+-                 
 
 # Nice-to-have
 - Use auto-merge library to have collabarative text editing
