@@ -458,14 +458,26 @@ async function bootAndGetSocket() {
         console.log("remove-user 0")
         const elToRemove = document.getElementById(socketId);
         if (elToRemove) {
-            dataChannels[socketId].close();
-            RTCConnections[socketId].close();
-            delete RTCConnections[socketId];
-            delete dataChannels[socketId];
-            delete electionPointsReceived[socketId];
+            if (dataChannels.hasOwnProperty(socketId)) {
+                dataChannels[socketId].close();
+            }
+            if (RTCConnections.hasOwnProperty(socketId)) {
+                RTCConnections[socketId].close();
+                delete RTCConnections[socketId];
+            }
+            if (dataChannels.hasOwnProperty(socketId)) {
+                delete dataChannels[socketId];
+            }
+            if (electionPointsReceived.hasOwnProperty(socketId)) {
+                delete electionPointsReceived[socketId];
+            }
             activeConnectionSize--;
-            delete RTCConnectionsCallStatus[socketId];
-            delete RTCConnectionNames[socketId];
+            if (RTCConnectionsCallStatus.hasOwnProperty(socketId)) {
+                delete RTCConnectionsCallStatus[socketId];
+            }
+            if (RTCConnectionNames.hasOwnProperty(socketId)) {
+                delete RTCConnectionNames[socketId];
+            }
             if (socketId === supremeMixerPeer) {
                 //The supremeMixer just left
                 //Reset everything, prompt for a new supreme mixer
