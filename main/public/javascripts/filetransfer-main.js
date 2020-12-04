@@ -75,7 +75,7 @@ async function configureChannel(dataChannel, id) {
     dataChannel.binaryType = 'arraybuffer'
     dataChannel.addEventListener('open', onSendChannelStateChange(dataChannel));
     dataChannel.addEventListener('close', onSendChannelStateChange(dataChannel));
-    dataChannel.addEventListener('error', error => console.error('Error in sendChannel:', error));
+    dataChannel.addEventListener('error', error => console.error('Error in sendChannel:' + id, error));
 }
 
 
