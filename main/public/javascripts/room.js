@@ -572,6 +572,10 @@ function castRemoteStreamToFocus(socketId) {
     if (alreadyExistingUser !== false) {
         let focusVid = document.getElementById("VideoTab");
         focusVid.append(alreadyExistingUser);
+        focusVid.onclick = () => {
+            let cont = document.getElementById(socketId + " container");
+            cont.appendChild(alreadyExistingUser);
+        }
     }
 }
 
@@ -682,6 +686,7 @@ function updateUserList(socketIds) {
 function createUserVideoItemContainer(socketId) {
     const userVideoContainerEl = document.createElement("div");
     const userVideoEl = document.createElement("video");
+    userVideoContainerEl.setAttribute("id", socketId + " container")
     userVideoEl.setAttribute("class", "active-user-video");
     userVideoEl.setAttribute("id", socketId);
     userVideoEl.setAttribute("autoplay", "true")
