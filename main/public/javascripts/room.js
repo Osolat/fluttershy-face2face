@@ -9,7 +9,6 @@ textInput.on("keypress", function (event) {
         sendChatMessage(str).then(() => textInput.val(""));
     }
 });
-
 //For mixing
 // let canvasForPeers = document.getElementById('mix-canvas');
 let canvasForPeers = document.createElement('canvas');
@@ -57,12 +56,74 @@ let black = ({width = 1, height = 1} = {}) => {
 let blackSilence = (...args) => new MediaStream([black(...args), silence()]);
 let dummyAudioTrack = blackSilence().getAudioTracks()[0];
 let dummyVideoTrack = blackSilence().getVideoTracks()[0];
+
+let analyserNode = audioContext.createAnalyser();
+var frequencyArray = new Uint8Array(analyserNode.frequencyBinCount);
+let emptyFrequencyArray = new Uint8Array(analyserNode.frequencyBinCount);
+let stringifiedEmpty = JSON.stringify(emptyFrequencyArray);
+let audioTesting = false;
+if (audioTesting) {
+    let myself = setInterval(() => {
+        analyserNode.getByteFrequencyData(frequencyArray);
+        let soundDetected = JSON.stringify(frequencyArray) !== stringifiedEmpty
+        if (soundDetected) {
+            var d = new Date(tsync.now());
+            console.log("Audio detected from some client/mixer I am connected to")
+            console.log(d.getTime());
+            clearInterval(myself);
+        }
+    }, 50)
+}
+const audioTestButton = document.getElementById("audio-test");
+audioTestButton.addEventListener("click", () => {
+    let v = audioContext.createOscillator()
+    let u = audioContext.createGain()
+    v.connect(u)
+    v.frequency.value = 500
+    v.type = "square"
+    for (const [sock, _] of Object.entries(outputNodes)) {
+        u.connect(outputNodes[sock]);
+    }
+    u.gain.value = 0.30;
+    v.start(audioContext.currentTime)
+    v.stop(audioContext.currentTime + 0.5)
+    var d = new Date(tsync.now());
+    console.log("Started sound at timestamp: ")
+    console.log(d.getTime());
+});
+
 /*let oscillatorDummy = audioContext.createOscillator();
 let dummyDest = oscillatorDummy.connect(audioContext.createMediaStreamDestination());
 oscillatorDummy.start();
 let dummyAudioStream = dummyDest.stream;
 let dummyVideoStream = dummmyCanvas.captureStream();*/
+/*let P10 = document.getElementById("P10");
+let P20 = document.getElementById("P20");
+let P30 = document.getElementById("P30");
+let P40 = document.getElementById("P40");
+let P50 = document.getElementById("P50");
+let P60 = document.getElementById("P60");
+let P70 = document.getElementById("P70");
+let P80 = document.getElementById("P80");
+let P90 = document.getElementById("P90");
 
+function renderFrame() {
+    analyserNode.getByteFrequencyData(dataArray);
+    P10.style.height = ((dataArray[0] * 100) / 256) + "%";
+    P20.style.height = ((dataArray[1] * 100) / 256) + "%";
+    P30.style.height = ((dataArray[2] * 100) / 256) + "%";
+    P40.style.height = ((dataArray[3] * 100) / 256) + "%";
+    P50.style.height = ((dataArray[4] * 100) / 256) + "%";
+    P60.style.height = ((dataArray[5] * 100) / 256) + "%";
+    P70.style.height = ((dataArray[6] * 100) / 256) + "%";
+    P80.style.height = ((dataArray[7] * 100) / 256) + "%";
+    P90.style.height = ((dataArray[8] * 100) / 256) + "%";
+    console.log(dataArray)
+    console.log(JSON.stringify(dataArray) === JSON.stringify(emptyArray))
+    requestAnimationFrame(renderFrame);
+}
+
+renderFrame();*/
 let micNodes = [];
 let outputNodes = [];
 let outputNode;
@@ -592,6 +653,11 @@ function getOntrackFunction(socketId) {
         const remoteVideo = document.getElementById(socketId);
         if (remoteVideo) {
             remoteVideo.srcObject = stream;
+            if (audioTesting) {
+                let m = audioContext.createMediaStreamSource(stream);
+                micNodes[socketId] = m;
+                m.connect(analyserNode);
+            }
         }
         // TODO might not be necessary?
         /*if (isMixingPeer) {
@@ -793,8 +859,11 @@ function gotStream(stream) {
     window.localStream = stream;
     console.log(stream.getTracks());
     audioContext.resume();
+    console.log("Creating myMicNode now")
     myMicNode = audioContext.createMediaStreamSource(localVideo.srcObject);
-
+    if (audioTesting) {
+        myMicNode.connect(analyserNode);
+    }
     //TODO might not be necessary
     /*if (isMixingPeer) {
         outputNode = audioContext.createMediaStreamDestination();
@@ -917,8 +986,8 @@ async function evaluateElectionNeed(sock) {
                 if (report.isRemote) {
                     return;
                 }
-                /*  console.log(report)
-                  console.log(Object.keys(report))*/
+                /* console.log(report)
+                 console.log(Object.keys(report))*/
                 if (report.qualityLimitationResolutionChanges >= 5 || report.pliCount >= 3) {
                     //Resolution changes is in-built webRTC. Resolution changes if GPU stutters or not enough broadband
                     //pliCount is a packet response if video specifically drops a frame
@@ -1066,6 +1135,8 @@ function bitRateBenchMark(socketID) {
                 if (report.isRemote) {
                     return;
                 }
+                //console.log(report)
+                //console.log(Object.keys(report))
                 const now = report.timestamp;
                 bytes = report.bytesSent;
                 headerBytes = report.headerBytesSent;
@@ -1245,6 +1316,9 @@ function resetAudioNodes() {
             if (remoteVideo) {
                 micNodes[sock] = audioContext.createMediaStreamSource(remoteVideo.srcObject);
                 console.log(micNodes[sock]);
+                if (audioTesting) {
+                    micNodes[sock].connect(analyserNode);
+                }
             }
         }
     }
