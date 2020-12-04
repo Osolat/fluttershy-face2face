@@ -72,7 +72,7 @@ if (audioTesting) {
             console.log(d.getTime());
             clearInterval(myself);
         }
-    }, 50)
+    }, 100)
 }
 const audioTestButton = document.getElementById("audio-test");
 audioTestButton.addEventListener("click", () => {
