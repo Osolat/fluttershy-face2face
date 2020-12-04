@@ -222,7 +222,7 @@ function hashCode(string) {
     return hash;
 }
 
-function sendMetaData() {
+function sendMetaData(displayType) {
     let file = fileInput.files[0];
     console.log(file);
     file.text().then(
@@ -235,9 +235,11 @@ function sendMetaData() {
                 name: file.name,
                 size: file.size,
                 filetype: file.type,
-                hash: hash
+                hash: hash,
+                displayType: displayType
             })
             sendToAll(JSONdata)
+            filemetadata[hash] = JSONdata
         }
     )
 }
@@ -602,9 +604,12 @@ async function bootAndGetSocket() {
 
     socket.on("answer-made", async data => {
         console.log("Got 'answer-made': " + data.socket)
-        await RTCConnections[data.socket].setRemoteDescription(
-            new RTCSessionDescription(data.answer)
-        );
+
+        try {
+            await RTCConnections[data.socket].setRemoteDescription(new RTCSessionDescription(data.answer))
+        } catch (e) {
+            console.log(e.message)
+        }
         if (!dataChannels[data.socket]) {
             let newChannel = filetransfer.createChannel(RTCConnections[data.socket], data.socket)
             newChannel.onmessage = onReceiveMessageCallback
@@ -662,6 +667,11 @@ async function bootAndGetSocket() {
             to: data.socket
         });
     });
+    socket.on("call-order", async data => {
+        console.log("Got call-order"+data.socket)
+        updateUserList([data.socket])
+
+    })
     socket.emit("request-user-list", roomID);
     socket.emit('identification', nickName);
     socket.emit("request-user-names");
@@ -783,9 +793,21 @@ function updateUserList(socketIds) {
             userContainerEl.onclick = () => castRemoteStreamToFocus(socketId);
             activeUserContainer.appendChild(userContainerEl);
             initNewRTCConnection(socketId);
-            callUser(socketId);
+            callOrBeCalled(socketId)
+        } else if (!RTCConnectionsCallStatus[socketId]) {
+            callOrBeCalled(socketId)
         }
     });
+}
+
+function callOrBeCalled(id) {
+    if (id < socket.id && !RTCConnectionsCallStatus[id]) {
+        callUser(id)
+    } else  {
+        console.log("Emitting call-me to: "+id);
+        socket.emit("call-me", {to: id})
+        RTCConnectionsCallStatus[id] = true
+    }
 }
 
 function createUserVideoItemContainer(socketId) {

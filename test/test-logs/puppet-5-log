@@ -1,0 +1,91 @@
+blyat
+200 http://localhost/
+200 http://localhost/stylesheets/style.css
+200 http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js
+200 https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js
+200 https://fonts.googleapis.com/css?family=Montserrat:300,400,500,700&display=swap
+200 http://localhost/images/chat-icon.png
+200 https://fonts.gstatic.com/s/montserrat/v15/JTURjIg1_i6t8kCHKm45_dJE3gnD_g.woff2
+200 https://fonts.gstatic.com/s/montserrat/v15/JTUSjIg1_i6t8kCHKm459Wlhyw.woff2
+200 http://localhost/rooms?group-id=Russia&password=1234&name=Cotton%20Eye%20John
+Promise { <pending> }
+LOG Russia
+LOG 1234
+200 http://localhost/roomPage.html
+200 https://fonts.googleapis.com/css?family=Montserrat:300,400,500,700&display=swap
+200 http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js
+200 https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js
+200 http://localhost/javascripts/room.js
+304 http://localhost/stylesheets/style.css
+200 http://localhost/timesync/timesync.js
+200 https://cdn.anychart.com/releases/8.8.0/js/anychart-core.min.js
+200 https://cdn.anychart.com/releases/8.8.0/js/anychart-graph.min.js
+200 https://cdn.anychart.com/releases/8.8.0/js/anychart-data-adapter.min.js
+200 http://localhost/javascripts/filetransferHtmlWrite.js
+304 http://localhost/images/chat-icon.png
+200 https://fonts.gstatic.com/s/montserrat/v15/JTUSjIg1_i6t8kCHKm459Wlhyw.woff2
+200 https://fonts.gstatic.com/s/montserrat/v15/JTURjIg1_i6t8kCHKm45_dJE3gnD_g.woff2
+WAR Warning: 904
+Description: You try make edge with id "edge_0" on one node with id "me". 
+WAR A parser-blocking, cross site (i.e. different eTLD+1) script, http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+WAR A parser-blocking, cross site (i.e. different eTLD+1) script, https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+WAR A parser-blocking, cross site (i.e. different eTLD+1) script, https://webrtc.github.io/adapter/adapter-latest.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+WAR A parser-blocking, cross site (i.e. different eTLD+1) script, http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+WAR A parser-blocking, cross site (i.e. different eTLD+1) script, https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+WAR A parser-blocking, cross site (i.e. different eTLD+1) script, https://webrtc.github.io/adapter/adapter-latest.js, is invoked via document.write. The network request for this script MAY be blocked by the browser in this or a future page load due to poor network connectivity. If blocked in this page load, it will be confirmed in a subsequent console message. See https://www.chromestatus.com/feature/5718547946799104 for more details.
+200 https://fonts.gstatic.com/s/montserrat/v15/JTUSjIg1_i6t8kCHKm459Wlhyw.woff2
+200 https://fonts.gstatic.com/s/montserrat/v15/JTURjIg1_i6t8kCHKm45_dJE3gnD_g.woff2
+200 https://fonts.gstatic.com/s/montserrat/v15/JTUSjIg1_i6t8kCHKm459Wlhyw.woff2
+200 https://fonts.gstatic.com/s/montserrat/v15/JTURjIg1_i6t8kCHKm45_dJE3gnD_g.woff2
+200 http://localhost/javascripts/filetransfer-main.js
+200 https://fonts.gstatic.com/s/montserrat/v15/JTURjIg1_i6t8kCHKm45_ZpC3gnD_g.woff2
+200 https://webrtc.github.io/adapter/adapter-latest.js
+LOG 1607100811609
+LOG Requesting local stream
+200 http://static.anychart.com/logo.png
+200 http://localhost/socket.io/?group-id=Russia&EIO=3&transport=polling&t=NOkh4c9
+200 http://localhost/socket.io/?group-id=Russia&EIO=3&transport=polling&t=NOkh4en&sid=A4CuJ_mfPmohl55pAAAQ
+LOG Received local stream
+LOG JSHandle@array
+LOG Creating myMicNode now
+LOG Uploaded message: My id : A4CuJ_mfPmohl55pAAAQ
+LOG Setup finished
+LOG My id is: A4CuJ_mfPmohl55pAAAQ
+LOG Got 'update-user-list'
+LOG Emitting call-me to: zVn5RK_TkJtCtesFAAAM
+LOG Emitting call-me to: Dk4gqGeHpirpCCyPAAAN
+LOG Emitting call-me to: tjZ57m13OIhiSmAeAAAO
+LOG Emitting call-me to: z3deACbZEdEnSJYnAAAP
+LOG Latest names
+LOG Latest names
+LOG Got 'call-made': zVn5RK_TkJtCtesFAAAM
+LOG Latest names
+LOG Got 'call-made': Dk4gqGeHpirpCCyPAAAN
+LOG Got 'call-made': tjZ57m13OIhiSmAeAAAO
+LOG Latest names
+LOG Got 'call-made': z3deACbZEdEnSJYnAAAP
+LOG Got 'call-made': zVn5RK_TkJtCtesFAAAM
+LOG Got 'call-made': tjZ57m13OIhiSmAeAAAO
+LOG Got 'call-made': z3deACbZEdEnSJYnAAAP
+DOMException: Failed to execute 'createAnswer' on 'RTCPeerConnection': PeerConnection cannot create an answer in a state other than have-remote-offer or have-local-pranswer.
+LOG Got 'call-made': Dk4gqGeHpirpCCyPAAAN
+LOG Got 'call-made': Dk4gqGeHpirpCCyPAAAN
+LOG Got 'call-made': z3deACbZEdEnSJYnAAAP
+LOG Got 'call-made': tjZ57m13OIhiSmAeAAAO
+LOG Got 'call-made': zVn5RK_TkJtCtesFAAAM
+LOG Send channel state is: open
+LOG JSHandle@object
+LOG Send channel state is: open
+LOG JSHandle@object
+LOG Send channel state is: open
+LOG JSHandle@object
+LOG Send channel state is: open
+LOG JSHandle@object
+LOG Send channel state is: open
+LOG JSHandle@object
+LOG Send channel state is: open
+LOG JSHandle@object
+LOG Send channel state is: open
+LOG JSHandle@object
+LOG Send channel state is: open
+LOG JSHandle@object
