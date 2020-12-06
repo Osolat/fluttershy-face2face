@@ -51,7 +51,7 @@ async function joinExisting(joinerBrowser, groupName, password) {
             .on('requestfailed', request =>
                 console.log(`${request.failure().errorText} ${request.url()}`))
     }
-    await joinerPage.goto('http://localhost');
+    await joinerPage.goto('http://172.20.176.1/');
     await joinerPage.click('aria/button[name="JOIN"]');
     await joinerPage.click('aria/textbox[name="Enter Room ID"]');
     await joinerPage.type('aria/textbox[name="Enter Room ID"]', groupName);
@@ -101,11 +101,13 @@ async function joinPreExistingRoom(groupName, password) {
 
 async function joinPreExistingRoomAndHang(groupName, password) {
     const joinerBrowser = await puppeteer.launch({
+        headless: true,
         args: [
+            ' --unsafely-treat-insecure-origin-as-secure="http://172.20.176.1"',
             '--use-fake-ui-for-media-stream',
             '--use-fake-device-for-media-stream',
-            'autoclose=False'
-        ]
+            '--no-sandbox',
+            '--autoclose=false']
     });
     let joinerPage = joinExisting(joinerBrowser, groupName, password)
     //await joinerPage.screenshot({path: 'test-dls/joinExistingHang.png'});
@@ -119,10 +121,9 @@ async function testCreateRoom(groupName, password) {
         ]
     });
     let page = await createNewRoom(browser, groupName, password);
-   // await page.screenshot({path: 'test-dls/exampleGroup.png'});
+    // await page.screenshot({path: 'test-dls/exampleGroup.png'});
     await browser.close();
 }
-
 
 
 let logging = true;
