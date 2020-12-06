@@ -50,9 +50,13 @@ let silence = () => {
     return Object.assign(dst.stream.getAudioTracks()[0], {enabled: false});
 }
 
-let black = ({width = 1, height = 1} = {}) => {
+let black = ({width = 420, height = 420} = {}) => {
+    let img = document.createElement("img");
+    img.src = "images/Hat-Waluigi-icon.png";
+    let tab = document.getElementById("VideoTab")
     let canvas = Object.assign(document.createElement("canvas"), {width, height});
-    canvas.getContext('2d').fillRect(0, 0, width, height);
+    //canvas.getContext('2d').fillRect(0, 0, width, height);
+    canvas.getContext('2d').drawImage(img, 0, 0)
     let stream = canvas.captureStream();
     return Object.assign(stream.getVideoTracks()[0], {enabled: false});
 }
@@ -67,6 +71,23 @@ let emptyFrequencyArray = new Uint8Array(analyserNode.frequencyBinCount);
 let stringifiedEmpty = JSON.stringify(emptyFrequencyArray);
 let audioTesting = false;
 if (audioTesting) {
+    const audioTestButton = document.getElementById("audio-test");
+    audioTestButton.addEventListener("click", () => {
+        let v = audioContext.createOscillator()
+        let u = audioContext.createGain()
+        v.connect(u)
+        v.frequency.value = 50
+        v.type = "square"
+        for (const [sock, _] of Object.entries(outputNodes)) {
+            u.connect(outputNodes[sock]);
+        }
+        u.gain.value = 0.05;
+        v.start(audioContext.currentTime)
+        v.stop(audioContext.currentTime + 0.5)
+        var d = new Date(tsync.now());
+        console.log("Started sound at timestamp: ")
+        console.log(d.getTime());
+    });
     let myself = setInterval(() => {
         analyserNode.getByteFrequencyData(frequencyArray);
         let soundDetected = JSON.stringify(frequencyArray) !== stringifiedEmpty
@@ -77,24 +98,10 @@ if (audioTesting) {
             clearInterval(myself);
         }
     }, 100)
+} else {
+    const audioTestButton = document.getElementById("audio-test");
+    audioTestButton.style.display = "none";
 }
-const audioTestButton = document.getElementById("audio-test");
-audioTestButton.addEventListener("click", () => {
-    let v = audioContext.createOscillator()
-    let u = audioContext.createGain()
-    v.connect(u)
-    v.frequency.value = 50
-    v.type = "square"
-    for (const [sock, _] of Object.entries(outputNodes)) {
-        u.connect(outputNodes[sock]);
-    }
-    u.gain.value = 0.05;
-    v.start(audioContext.currentTime)
-    v.stop(audioContext.currentTime + 0.5)
-    var d = new Date(tsync.now());
-    console.log("Started sound at timestamp: ")
-    console.log(d.getTime());
-});
 
 /*let oscillatorDummy = audioContext.createOscillator();
 let dummyDest = oscillatorDummy.connect(audioContext.createMediaStreamDestination());
@@ -154,7 +161,8 @@ networkButton.addEventListener('click', () => {
 
 let localVid = document.getElementById('local-video');
 localVid.addEventListener("click", () => {
-    bruteForceElectionInMyFavour();
+    //bruteForceElectionInMyFavour();
+    forceElection();
 });
 const sendFileButton = document.querySelector('button#sendFile');
 sendFileButton.addEventListener('click', () => {
@@ -190,7 +198,7 @@ let peerElectionPoints = {};
 let electionInitiated = false;
 let electionNum = 0;
 let allowedSubNetworkSize = 2;
-let debugging = true;
+let debugging = false;
 let supremeMixerPeer;
 let myMicNode;
 let myMicNode2;
@@ -614,6 +622,15 @@ async function bootAndGetSocket() {
             let newChannel = filetransfer.createChannel(RTCConnections[data.socket], data.socket)
             newChannel.onmessage = onReceiveMessageCallback
             dataChannels[data.socket] = newChannel;
+            if (supremeMixerPeer === socket.id) {
+                console.log("This stuff happened 3")
+                networkSplit[socket.id].push(data.socket);
+                sendToAll(JSON.stringify({
+                    type: "networkSplit",
+                    origin: socket.id,
+                    networkData: networkSplit
+                }))
+            }
         }
         if (!RTCConnectionsCallStatus[data.socket]) {
             callUser(data.socket);
@@ -637,6 +654,7 @@ async function bootAndGetSocket() {
                 filetransfer.configureChannel(dataChannel, data.socket)
                 dataChannels[data.socket] = dataChannel
                 if (supremeMixerPeer === socket.id) {
+                    console.log("This stuff happened 1")
                     networkSplit[socket.id].push(data.socket);
                     sendToAll(JSON.stringify({
                         type: "networkSplit",
@@ -653,6 +671,7 @@ async function bootAndGetSocket() {
                 filetransfer.configureChannel(dataChannel, data.socket)
                 dataChannels[data.socket] = dataChannel
                 if (supremeMixerPeer === socket.id) {
+                    console.log("This stuff happened 2")
                     networkSplit[socket.id].push(data.socket);
                     sendToAll(JSON.stringify({
                         type: "networkSplit",
@@ -668,7 +687,7 @@ async function bootAndGetSocket() {
         });
     });
     socket.on("call-order", async data => {
-        console.log("Got call-order"+data.socket)
+        console.log("Got call-order" + data.socket)
         updateUserList([data.socket])
 
     })
@@ -803,8 +822,8 @@ function updateUserList(socketIds) {
 function callOrBeCalled(id) {
     if (id < socket.id && !RTCConnectionsCallStatus[id]) {
         callUser(id)
-    } else  {
-        console.log("Emitting call-me to: "+id);
+    } else {
+        console.log("Emitting call-me to: " + id);
         socket.emit("call-me", {to: id})
         RTCConnectionsCallStatus[id] = true
     }
@@ -840,13 +859,27 @@ function createUserItemContainer(socketId) {
 
 async function initLocalStream() {
     console.log('Requesting local stream');
-    await navigator.mediaDevices
-        .getUserMedia({
-            audio: true,
-            video: true
-        })
-        .then(gotStream)
-        .catch(e => console.log('getUserMedia() error: ', e));
+    if (navigator.mediaDevices === undefined) {
+        //let constraints = {width: 420, height: 420};
+        let retardVideo = document.createElement("video");
+        retardVideo.srcObject = blackSilence();
+        console.log(retardVideo)
+        window.localStream = retardVideo.srcObject;
+        audioContext.resume();
+        console.log(window.localStream)
+        myMicNode = audioContext.createMediaStreamSource(retardVideo.srcObject);
+        if (audioTesting) {
+            myMicNode.connect(analyserNode);
+        }
+    } else {
+        await navigator.mediaDevices
+            .getUserMedia({
+                audio: true,
+                video: true
+            })
+            .then(gotStream)
+            .catch(e => console.log('getUserMedia() error: ', e));
+    }
 }
 
 async function callUser(socketId) {
@@ -988,11 +1021,11 @@ function initVideoAndAudioNodesAsMixer() {
 }
 
 function becomeMixer() {
-    startCapturingToCanvas();
     isMixingPeer = true;
     console.log("become mixer 1: " + mixingPeers);
     mixingPeers.push(socket.id);
     console.log("become mixer 2: " + mixingPeers);
+    startCapturingToCanvas();
     initVideoAndAudioNodesAsMixer();
     updateTracksAsMixer();
 
@@ -1334,12 +1367,14 @@ function electMixers(mixerSpots) {
     if (electee === socket.id) {
         console.log("I became mixer")
         // We should only have one mixer at this point.
+        networkSplit[electee] = Array.from(roomConnectionsSet);
         console.assert(mixingPeers.length === 0)
-        networkSplit[socket.id] = Array.from(roomConnectionsSet);
         becomeMixer();
     } else {
-        rebootStreamTargets();
         mixingPeers.push(electee)
+        networkSplit[electee] = Array.from(roomConnectionsSet);
+        networkSplit[electee].push(socket.id);
+        rebootStreamTargets();
     }
 }
 
@@ -1461,6 +1496,7 @@ async function rebootStreamTargets() {
     if (!isMixingPeer) {
         //I am a regular client, and I should only stream video/audio to the mixer
         let myMixer;
+        console.log(networkSplit);
         for (const [sock, arr] of Object.entries(networkSplit)) {
             if (arr.includes(socket.id)) {
                 myMixer = sock;
@@ -1724,7 +1760,7 @@ function onReceiveMessageCallback(event) {
                 console.log(mixPeers)                                                                               //Print out values
                 if (mixer != socket.id) {
                     console.log("Not a node that is our self")
-                    if (findDuplicateNode(mixer) != true) {                                                         //If the key is noy oneself, push it to the networkGraph as node    
+                    if (findDuplicateNode(mixer) != true) {                                                         //If the key is noy oneself, push it to the networkGraph as node
                         netGraphTopologyData.nodes.push({id: mixer, group: "mixing"})
 
                         addEdges(mixer, Object.keys(data.split))
@@ -1756,9 +1792,9 @@ function onReceiveMessageCallback(event) {
 
                     addEdges("me", Object.keys(data.split))                                                         //Add egdes from "me" to all the mixer peers
 
-                    mixPeers.forEach(nonMixer2 => {                                                                 //Go through all the non-mixers 
+                    mixPeers.forEach(nonMixer2 => {                                                                 //Go through all the non-mixers
                         if (nonMixer2 != socket.id) {                                                               //Check if the non-mixer is yourself if so then
-                            if (findDuplicateNode(nonMixer2) != true) {                                             //push that node as non-mixer and add edges from "me" to it 
+                            if (findDuplicateNode(nonMixer2) != true) {                                             //push that node as non-mixer and add edges from "me" to it
                                 netGraphTopologyData.nodes.push({id: nonMixer2, group: "nonMixing"})
                             }
                             if (findDuplicateEdge("me", nonMixer2) != true) {
@@ -1973,7 +2009,7 @@ function findDuplicateNode(element) {
 
 function findDuplicateEdge(from, to) {
     //Given some element "from" and some element "to" check if the edge between "from" and "to" already exist in the network graph
-    //If it does return true otherwise return false. 
+    //If it does return true otherwise return false.
     var netWorkEdgeFound = false;
     for (var i = 0; i < netGraphTopologyData.edges.length; i++) {
         if (netGraphTopologyData.edges[i].from == from && netGraphTopologyData.edges[i].to == to) {
@@ -2054,9 +2090,9 @@ function drawElectedMixerNode() {                                               
                     }                                                                                       //Remove 1 non-mixer and we end up in the example above
                     if (findDuplicateEdge(nonMixer, mixer) != true) {                                       //Then remove the peer that is mixing but shouldn't be mixing (not the supreme)
                         netGraphTopologyData.edges.push({from: nonMixer, to: mixer})
-                    }                                                                                       //Network split becomes: mixer1: Array [ "BuAfoMOFufgtcDZfAACM", undefined ]        
+                    }                                                                                       //Network split becomes: mixer1: Array [ "BuAfoMOFufgtcDZfAACM", undefined ]
                 })                                                                                          //Should not be undefined??? Remove peers + graph (only removing) works for non-mixers, and mixers elected.
-                addEdges(mixer, Object.keys(networkSplit))                                                  //Does not work when supreme removed, and if the last non-mixing peer is removed             
+                addEdges(mixer, Object.keys(networkSplit))                                                  //Does not work when supreme removed, and if the last non-mixing peer is removed
             }
         } else {
             console.log("socket id is the same as the mixer we are looking at:")
@@ -2080,7 +2116,7 @@ function updateOnRemove(set) {
 }
 
 function twoMixerToplogy(data, set, element) {
-    //TODO: Fix this function to correctly connect mixing peers to non-mixing peers 
+    //TODO: Fix this function to correctly connect mixing peers to non-mixing peers
     //Possibly fixed with tree-structure? Parent nodes and child nodes
 
     var conSet = Array.from(set)
@@ -2172,14 +2208,14 @@ function updateGraph() {
 }
 
 function populateNetwork() {
-    //Polulates the network with all the new peers. Whenever new peers connect, networkRequests and mixingNetworkRequest 
+    //Polulates the network with all the new peers. Whenever new peers connect, networkRequests and mixingNetworkRequest
     //are sent out to all other peers connected, and then the graph is updated according to the reponse the different peers¨
     //gives.
     //console.log("array of mixingPeers")
     //console.log(mixingPeers)
     console.log("PopulateNetwork Function has been called!")
     anychart.onDocumentReady(function () {
-        //TODO: 
+        //TODO:
         //Update graph also when peers leave the network. (DONE for non-mixing peers)
         //Update graph correct when there is two mixing peers
         console.log("netGraphTopologyData")

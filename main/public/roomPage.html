@@ -116,27 +116,27 @@
                             edges: [
                                 {from: "me", to: "me"}
                             ]
-                            };
+                        };
 
-                            // create a chart and set the data
-                            var chart = anychart.graph(data);
+                        // create a chart and set the data
+                        var chart = anychart.graph(data);
 
-                            chart.title("Network Graph showing all peers");
-                            // draw the chart
+                        chart.title("Network Graph showing all peers");
+                        // draw the chart
 
-                            // enable the labels of nodes
-                            chart.nodes().labels().enabled(true);
+                        // enable the labels of nodes
+                        chart.nodes().labels().enabled(true);
 
-                            // configure the labels of nodes
-                            chart.nodes().labels().format("{%id}");
-                            chart.nodes().labels().fontSize(12);
-                            chart.nodes().labels().fontWeight(600);
+                        // configure the labels of nodes
+                        chart.nodes().labels().format("{%id}");
+                        chart.nodes().labels().fontSize(12);
+                        chart.nodes().labels().fontWeight(600);
 
-                            // set the container id
-                            chart.container("container");
+                        // set the container id
+                        chart.container("container");
 
-                            // initiate drawing the chart
-                            chart.draw();
+                        // initiate drawing the chart
+                        chart.draw();
                     </script>
                 </div>
             </div>
@@ -166,7 +166,6 @@
 </div>
 
 <script>
-    
 
 
     function openPage(pageName, elmnt, color) {
