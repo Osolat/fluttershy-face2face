@@ -616,6 +616,7 @@ async function bootAndGetSocket() {
         try {
             await RTCConnections[data.socket].setRemoteDescription(new RTCSessionDescription(data.answer))
         } catch (e) {
+            console.log("setremote description fucked")
             console.log(e.message)
         }
         if (!dataChannels[data.socket]) {
@@ -859,27 +860,34 @@ function createUserItemContainer(socketId) {
 
 async function initLocalStream() {
     console.log('Requesting local stream');
-    if (navigator.mediaDevices === undefined) {
-        //let constraints = {width: 420, height: 420};
-        let retardVideo = document.createElement("video");
-        retardVideo.srcObject = blackSilence();
-        console.log(retardVideo)
-        window.localStream = retardVideo.srcObject;
-        audioContext.resume();
-        console.log(window.localStream)
-        myMicNode = audioContext.createMediaStreamSource(retardVideo.srcObject);
-        if (audioTesting) {
-            myMicNode.connect(analyserNode);
-        }
-    } else {
-        await navigator.mediaDevices
-            .getUserMedia({
-                audio: true,
-                video: true
-            })
-            .then(gotStream)
-            .catch(e => console.log('getUserMedia() error: ', e));
-    }
+    // if (navigator.mediaDevices === undefined) {
+    //     //let constraints = {width: 420, height: 420};
+    //     let retardVideo = document.createElement("video");
+    //     retardVideo.srcObject = blackSilence();
+    //     console.log(retardVideo)
+    //     window.localStream = retardVideo.srcObject;
+    //     audioContext.resume();
+    //     console.log(window.localStream)
+    //     myMicNode = audioContext.createMediaStreamSource(retardVideo.srcObject);
+    //     if (audioTesting) {
+    //         myMicNode.connect(analyserNode);
+    //     }
+    // } else {
+    //     await navigator.mediaDevices
+    //         .getUserMedia({
+    //             audio: true,
+    //             video: true
+    //         })
+    //         .then(gotStream)
+    //         .catch(e => console.log('getUserMedia() error: ', e));
+    // }
+    await navigator.mediaDevices
+        .getUserMedia({
+            audio: true,
+            video: true
+        })
+        .then(gotStream)
+        .catch(e => console.log('getUserMedia() error: ', e));
 }
 
 async function callUser(socketId) {
@@ -1782,7 +1790,6 @@ function onReceiveMessageCallback(event) {
                     })
 
                 } else {
-                    console.log("So me should be mixing")                                                           //If the key(mixer) is yourself, reset data
                     netGraphTopologyData = {                                                                        //and set "me" as a mixing node
                         nodes: [
                             {id: "me", group: "mixing"}
@@ -1812,8 +1819,7 @@ function onReceiveMessageCallback(event) {
             break;
         case "requestNetworkCallback":
             data.nodes
-            console.log("data.nodes")
-            console.log(data.nodes)
+
             //console.log("NetGrphTopologyData")
             //console.log(netGraphTopologyData)
             //console.log("ConnectionSet")
@@ -1822,10 +1828,8 @@ function onReceiveMessageCallback(event) {
             //console.log(socket.id)
             const empty = {};
             if (Object.keys(networkSplit).length === 0) {
-                console.log("networkSplit is empty meaning no mixers")
                 data.nodes.forEach(element => {
                     if (element != socket.id && findDuplicateNode(element) != true) {
-                        console.log("here not self")                                                                 //Case where we are looking at all the nodes that "me" is connected to
                         netGraphTopologyData.nodes.push({id: element, group: "nonMixing"})
                         if (mixingPeers.length == 0 && findDuplicateEdge("me", element) != true) {
                             netGraphTopologyData.edges.push({from: 'me', to: element})
@@ -2073,15 +2077,9 @@ function removeNonExistentDataFromGraph(set) {
 }
 
 function drawElectedMixerNode() {                                                                       //Bug example, connect 5 peers. two peers become mixers. add one more peer, then one more peer turns mixer
-    console.log("I am a mixing peer")                                                                   //so we have that each mixer is connected to 1 nonMixer peer. One non-mixer leave and then we
     Object.keys(networkSplit).forEach(mixer => {                                                        //are back at 5 peers but with 3 mixers. So one mixer1 is connected to one peer,
         let nonMixers = networkSplit[mixer];                                                            //mixer2 is connected to one peer and mixer3 is not connected to any.
-        console.log("socket.id of mixer")
-        console.log(socket.id)
-        console.log("mixer currently looking at")
-        console.log(mixer)
         if (mixer != socket.id) {
-            console.log("socket id is not the same as the mixer we are looking at:")
             if (findDuplicateNode(mixer) != true) {                                                         //networkSplit send: Object { "mixer1": (1) […], mixer2: (1) […], mixer3: [] } WRONG?!
                 netGraphTopologyData.nodes.push({id: mixer, group: "mixing"})                             //Network should detect if there are too many mixers to nonmixer, and it should make mixer to nonmixer??
                 nonMixers.forEach(nonMixer => {
@@ -2095,7 +2093,6 @@ function drawElectedMixerNode() {                                               
                 addEdges(mixer, Object.keys(networkSplit))                                                  //Does not work when supreme removed, and if the last non-mixing peer is removed
             }
         } else {
-            console.log("socket id is the same as the mixer we are looking at:")
         }                                                                                               //And only supreme left. (mixing undefined)
     })                                                                                                  //wants to add one/two edges to a node that doesn't exist when a peer becomes mixer
 }                                                                                                       //edge from me to "non-existent node which has value socket.id"
@@ -2213,16 +2210,10 @@ function populateNetwork() {
     //gives.
     //console.log("array of mixingPeers")
     //console.log(mixingPeers)
-    console.log("PopulateNetwork Function has been called!")
     anychart.onDocumentReady(function () {
         //TODO:
         //Update graph also when peers leave the network. (DONE for non-mixing peers)
         //Update graph correct when there is two mixing peers
-        console.log("netGraphTopologyData")
-        console.log(netGraphTopologyData)
-        console.log("networkSplit")
-        console.log(networkSplit)
-
         if (mixingPeers.length == 0 && Object.keys(networkSplit).length === 0) {
             let requestBody = {type: "requestNetworkNodes"}
             sendToAll(JSON.stringify(requestBody))
