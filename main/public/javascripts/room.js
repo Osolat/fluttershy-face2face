@@ -444,28 +444,32 @@ function authenticateUser() {
         postChatMessage("My id : " + socket.id, nickName);
         peerElectionPoints[socket.id] = 0;
         electionPointsReceived[socket.id] = false
-        tsync.send = function (id, data, _) {
-            //console.log('send', id, data);
-            //console.log(socket.id)
-            let packetString = JSON.stringify({
-                type: "timesync",
-                from: socket.id,
-                tsdata: data,
-            })
-            let channel = dataChannels[id];
-            if (channel) {
-                channel.send(packetString);
-            } else {
-                console.log(new Error('Cannot send message: not connected to ' + id).toString());
-            }
-            return Promise.resolve();
-        }
         tsync.on('sync', function (state) {
             //console.log("sync " + state)
-            if (state == "start") {
+            if (state === "start") {
                 tsync.options.peers = Object.keys(dataChannels)
             }
         });
+        tsync.send = function (id, data, _) {
+            try {
+                //console.log('send', id, data);
+                //console.log(socket.id)
+                let packetString = JSON.stringify({
+                    type: "timesync",
+                    from: socket.id,
+                    tsdata: data,
+                })
+                let channel = dataChannels[id];
+                if (channel) {
+                    channel.send(packetString);
+                } else {
+                    console.log(new Error('Cannot send message: not connected to ' + id).toString());
+                }
+                return Promise.resolve();
+            } catch (e) {
+                console.log(e.message)
+            }
+        }
         console.log("Setup finished");
         console.log("My id is: " + socket.id)
     });
