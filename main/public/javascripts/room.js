@@ -83,7 +83,7 @@ audioTestButton.addEventListener("click", () => {
     let v = audioContext.createOscillator()
     let u = audioContext.createGain()
     v.connect(u)
-    v.frequency.value = 500
+    v.frequency.value = 300
     v.type = "square"
     for (const [sock, _] of Object.entries(outputNodes)) {
         u.connect(outputNodes[sock]);
@@ -189,7 +189,7 @@ let benchmarkResponses = {};
 let peerElectionPoints = {};
 let electionInitiated = false;
 let electionNum = 0;
-let allowedSubNetworkSize = 2;
+let allowedSubNetworkSize = 20;
 let debugging = true;
 let supremeMixerPeer;
 let myMicNode;
