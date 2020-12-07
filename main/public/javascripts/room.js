@@ -69,7 +69,7 @@ let analyserNode = audioContext.createAnalyser();
 var frequencyArray = new Uint8Array(analyserNode.frequencyBinCount);
 let emptyFrequencyArray = new Uint8Array(analyserNode.frequencyBinCount);
 let stringifiedEmpty = JSON.stringify(emptyFrequencyArray);
-let audioTesting = false;
+let audioTesting = true;
 if (audioTesting) {
     const audioTestButton = document.getElementById("audio-test");
     audioTestButton.addEventListener("click", () => {
@@ -133,8 +133,8 @@ function renderFrame() {
     console.log(JSON.stringify(dataArray) === JSON.stringify(emptyArray))
     requestAnimationFrame(renderFrame);
 }
-
 renderFrame();*/
+
 let micNodes = [];
 let outputNodes = [];
 let outputNode;
@@ -161,8 +161,7 @@ networkButton.addEventListener('click', () => {
 
 let localVid = document.getElementById('local-video');
 localVid.addEventListener("click", () => {
-    //bruteForceElectionInMyFavour();
-    forceElection();
+    bruteForceElectionInMyFavour();
 });
 const sendFileButton = document.querySelector('button#sendFile');
 sendFileButton.addEventListener('click', () => {
@@ -190,7 +189,9 @@ let mixingPeers = [];
 let socket;
 let roomID;
 let nickName = "Anonymous";
-let bitRates = {};
+let bitratesUp = {};
+let bitratesDown = {};
+
 let frameEncodeTimes = {};
 let benchmarkBuffers = {};
 let benchmarkResponses = {};
@@ -198,7 +199,7 @@ let peerElectionPoints = {};
 let electionInitiated = false;
 let electionNum = 0;
 let allowedSubNetworkSize = 2;
-let debugging = false;
+let debugging = true;
 let supremeMixerPeer;
 let myMicNode;
 let myMicNode2;
@@ -520,7 +521,7 @@ function resetEverythingElectionRelated() {
     benchmarkBuffers = {};
     frameEncodeTimes = {};
     networkSplit = {};
-    bitRates = {};
+    bitratesUp = {};
     lastResult = {};
     mixingPeers = [];
     isMixingPeer = false;
@@ -762,7 +763,9 @@ function initNewRTCConnection(socketId) {
     activeConnectionSize++;
     RTCConnectionsCallStatus[socketId] = false;
     outputNodes[socketId] = audioContext.createMediaStreamDestination();
-    myMicNode.connect(outputNodes[socketId]);
+    if (!audioTesting) {
+        myMicNode.connect(outputNodes[socketId]);
+    }
     rtcConnection.addTrack(outputNodes[socketId].stream.getAudioTracks()[0], window.localStream);
     rtcConnection.addTrack(window.localStream.getVideoTracks()[0], window.localStream);
 
@@ -968,7 +971,7 @@ function gotStream(stream) {
     console.log("Creating myMicNode now")
     myMicNode = audioContext.createMediaStreamSource(localVideo.srcObject);
     if (audioTesting) {
-        myMicNode.connect(analyserNode);
+        //myMicNode.connect(analyserNode);
     }
     //TODO might not be necessary
     /*if (isMixingPeer) {
@@ -1079,7 +1082,7 @@ async function evaluateElectionNeed(sock) {
         return
     }
     let electionNeeded = false;
-    if (bitRates[sock].length > 0) {
+    if (bitratesUp[sock].length > 0) {
         let res = lastResult[sock];
         res.forEach(report => {
             if (report.type === 'outbound-rtp') {
@@ -1130,6 +1133,23 @@ async function bitRateEveryone() {
         if (debugging) continue;
         await evaluateElectionNeed(sock);
     }
+    let totalSumUp = 0;
+    let totalSumDown = 0;
+    for (const [sock, _] of Object.entries(bitratesUp)) {
+        if (bitratesUp[sock].length !== 0 && bitratesDown[sock].length !== 0) {
+            let summerUp = bitratesUp[sock].reduce((sum, num) => sum + num)
+            let avgUp = summerUp / bitratesUp[sock].length;
+            totalSumUp += avgUp;
+            console.log("Average bitrate for video: (" + sock + ") " + avgUp);
+            let summerDown = bitratesDown[sock].reduce((sum, num) => sum + num)
+            let avgDown = summerDown / bitratesDown[sock].length;
+            totalSumDown += avgDown;
+            console.log("Average bitrate for video: (" + sock + ") " + avgDown);
+        }
+    }
+    console.log("Average for all bitrates down: " + totalSumDown);
+    console.log("Average for all bitrates up: " + totalSumUp);
+
 }
 
 let networkSplit = {}
@@ -1225,8 +1245,9 @@ setInterval(bitRateEveryone, 1000 * 15);
 setInterval(pollMixerPerformance, 1000 * 30);
 
 function bitRateBenchMark(socketID) {
-    if (!bitRates[socketID]) {
-        bitRates[socketID] = [];
+    if (!bitratesUp[socketID]) {
+        bitratesDown[socketID] = [];
+        bitratesUp[socketID] = [];
         frameEncodeTimes[socketID] = [];
     }
 
@@ -1235,6 +1256,32 @@ function bitRateBenchMark(socketID) {
             let bytes;
             let headerBytes;
             //let packets;
+            if (report.type === "candidate-pair") {
+                //console.log(report)
+                //console.log(Object.keys(report))
+                const now = report.timestamp;
+                let bytesUp = report.bytesSent;
+                let bytesDown = report.bytesReceived;
+
+                //packets = report.packetsSent;
+                if (lastResult[socketID] && lastResult[socketID].has(report.id)) {
+                    const deltaT = now - lastResult[socketID].get(report.id).timestamp;
+                    // calculate bitrate
+                    const bitrateUp = 8 * (bytesUp - lastResult[socketID].get(report.id).bytesSent) /
+                        deltaT;
+                    const bitrateDown = 8 * (bytesDown - lastResult[socketID].get(report.id).bytesReceived) /
+                        deltaT;
+                    //const headerrate = 8 * (headerBytes - lastResult[socketID].get(report.id).headerBytesSent) /
+                    //    deltaT;
+                    //console.log("bitrates to " + socketID + ": " + bitrate)
+                    bitratesUp[socketID].push(bitrateUp);
+                    bitratesDown[socketID].push(bitrateDown);
+                    //console.log("frameencode to " + socketID + ": " + avgFrameEncodeTimeSinceLast)
+                    //frameEncodeTimes[socketID].push(avgFrameEncodeTimeSinceLast);
+                    //console.log(frameEncodeTimes)
+                }
+
+            }
             if (report.type === 'outbound-rtp') {
                 var str = report.id;
                 var str_pos = str.indexOf("Video");
@@ -1256,15 +1303,16 @@ function bitRateBenchMark(socketID) {
                     const deltaTimeF = report.totalEncodeTime - lastResult[socketID].get(report.id).totalEncodeTime;
                     const avgFrameEncodeTimeSinceLast = deltaTimeF / deltaFrames;
                     const deltaT = now - lastResult[socketID].get(report.id).timestamp;
-                    // calculate bitrate
-                    const bitrate = 8 * (bytes - lastResult[socketID].get(report.id).bytesSent) /
-                        deltaT;
-                    //const headerrate = 8 * (headerBytes - lastResult[socketID].get(report.id).headerBytesSent) /
-                    //    deltaT;
-                    //console.log("bitrates to " + socketID + ": " + bitrate)
-                    bitRates[socketID].push(bitrate);
+                    // // calculate bitrate
+                    // const bitrate = 8 * (bytes - lastResult[socketID].get(report.id).bytesSent) /
+                    //     deltaT;
+                    // //const headerrate = 8 * (headerBytes - lastResult[socketID].get(report.id).headerBytesSent) /
+                    // //    deltaT;
+                    // //console.log("bitrates to " + socketID + ": " + bitrate)
+                    // bitratesUp[socketID].push(bitrate);
                     //console.log("frameencode to " + socketID + ": " + avgFrameEncodeTimeSinceLast)
                     frameEncodeTimes[socketID].push(avgFrameEncodeTimeSinceLast);
+                    //console.log(frameEncodeTimes)
                 }
             }
         });
@@ -1312,7 +1360,7 @@ function rankAndAwardMixerPoints() {
             peerElectionPoints[sock] = 0;
         }
     }
-    for (const [_, ratesArray] of Object.entries(bitRates)) {
+    for (const [_, ratesArray] of Object.entries(bitratesUp)) {
         if (ratesArray.length === 0) continue;
         let totalAverage = ratesArray.reduce((sum, num) => sum + num) / ratesArray.length
         bitRatePool += totalAverage;
@@ -1321,8 +1369,8 @@ function rankAndAwardMixerPoints() {
     for (const [sock, _] of Object.entries(benchmarkResponses)) {
         let points = 0;
         let peerAverage = 0;
-        if (bitRates.hasOwnProperty(sock) && bitRates[sock].length !== 0) {
-            peerAverage = bitRates[sock].reduce((sum, num) => sum + num) / bitRates[sock].length
+        if (bitratesUp.hasOwnProperty(sock) && bitratesUp[sock].length !== 0) {
+            peerAverage = bitratesUp[sock].reduce((sum, num) => sum + num) / bitratesUp[sock].length
         }
         let peerAveragePoints;
         if (bitRatePool === 0) {
@@ -1566,6 +1614,14 @@ async function rebootStreamTargets() {
     }
 }
 
+function IWantEveryoneToStreamToMe() {
+    sendToAll(JSON.stringify({
+            type: "onlyStreamToMe",
+            origin: socket.id
+        }
+    ))
+}
+
 function onReceiveMessageCallback(event) {
     // console.log(`Received Message ${event.data}`);
     let data = JSON.parse(event.data)
@@ -1576,6 +1632,32 @@ function onReceiveMessageCallback(event) {
             electionBenchMarksSent = true;
             supremeMixerPeer = data.origin;
             break;
+        case "onlyStreamToMe":
+            let soloTarget = data.origin;
+            for (const [sock, _] of Object.entries(RTCConnections)) {
+                if (sock !== soloTarget) {
+                    let senders = RTCConnections[sock].getSenders();
+                    for (let i = 0; i < senders.length; i++) {
+                        //senders[i].replaceTrack(null).then(_ => console.log("Stopped a track"))
+                        if (senders[i].track === null) {
+                            console.log("Error, rebootStreamTargets, some track is null. Will recursively retry: " + sock)
+                            setTimeout(rebootStreamTargets, 500);
+                            return;
+                        }
+                        if (senders[i].track === null) {
+                            console.log("Track is null for some reason from :" + sock);
+                            var d = new Date(tsync.now());
+                            console.log(d.getTime());
+                            console.log(senders[i]);
+                        }
+                        if (senders[i].track.kind === "audio") {
+                            senders[i].replaceTrack(dummyAudioTrack).then(_ => console.log("Replaced dummy audio track to " + sock))
+                        } else if (senders[i].track.kind === "video") {
+                            senders[i].replaceTrack(dummyVideoTrack).then(_ => console.log("Replaced dummy video track to " + sock))
+                        }
+                    }
+                }
+            }
         case "electionPoints":
             for (const [id, votes] of Object.entries(data.points)) {
                 if (!peerElectionPoints.hasOwnProperty(id)) {
