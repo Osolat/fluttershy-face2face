@@ -7,6 +7,11 @@ textInput.on("keypress", function (event) {
         event.preventDefault();
         const str = textInput.val();
         sendChatMessage(str).then(() => textInput.val(""));
+        /*if (!debugging) {
+            sendChatMessage(str).then(() => textInput.val(""));
+        } else {
+            limitMyBandwidthToAll().catch(e => console.log(e + " " + e.message));
+        }*/
     }
 });
 //For mixing
@@ -69,7 +74,7 @@ let analyserNode = audioContext.createAnalyser();
 var frequencyArray = new Uint8Array(analyserNode.frequencyBinCount);
 let emptyFrequencyArray = new Uint8Array(analyserNode.frequencyBinCount);
 let stringifiedEmpty = JSON.stringify(emptyFrequencyArray);
-let audioTesting = true;
+let audioTesting = false;
 if (audioTesting) {
     const audioTestButton = document.getElementById("audio-test");
     audioTestButton.addEventListener("click", () => {
@@ -141,7 +146,7 @@ let outputNode;
 let audioMixStream;
 let audioMixStreams = [];
 
-
+let mixersIWant = [];
 // for filetransfer
 let peersReady = {};
 let receiveBuffers = {};
@@ -161,7 +166,7 @@ networkButton.addEventListener('click', () => {
 
 let localVid = document.getElementById('local-video');
 localVid.addEventListener("click", () => {
-    bruteForceElectionInMyFavour();
+    forceElection();
 });
 const sendFileButton = document.querySelector('button#sendFile');
 sendFileButton.addEventListener('click', () => {
@@ -198,8 +203,9 @@ let benchmarkResponses = {};
 let peerElectionPoints = {};
 let electionInitiated = false;
 let electionNum = 0;
-let allowedSubNetworkSize = 2;
-let debugging = true;
+let allowedSubNetworkSize = 3;
+let debugging = false;
+let uploadSpeedCap = 250;
 let supremeMixerPeer;
 let myMicNode;
 let myMicNode2;
@@ -442,7 +448,8 @@ function authenticateUser() {
     header.innerHTML = decodeURI(roomID);
     socket = io.connect(window.location.hostname, {query: {"group-id": roomID}});
     bootAndGetSocket().then(_ => {
-        postChatMessage("My id : " + socket.id, nickName);
+        //postChatMessage("My id : " + socket.id, nickName);
+        console.log("My id: " + socket.id);
         peerElectionPoints[socket.id] = 0;
         electionPointsReceived[socket.id] = false
         tsync.on('sync', function (state) {
@@ -509,6 +516,19 @@ function removeUseFromNetworkSplit(socketId) {
                 arr.splice(index, 1);
                 return;
             }
+        }
+    }
+}
+
+async function limitMyBandwidthToAll() {
+    for (const [sock, conn] of Object.entries(RTCConnections)) {
+        let senders = conn.getSenders();
+        console.log(senders)
+        for (let i = 0; i < senders.length; i++) {
+            let params = senders[i].getParameters();
+            console.log(params)
+            params.encodings[0].maxBitrate = uploadSpeedCap;
+            senders[i].setParameters(params).catch(e => console.error(e));
         }
     }
 }
@@ -766,9 +786,19 @@ function initNewRTCConnection(socketId) {
     if (!audioTesting) {
         myMicNode.connect(outputNodes[socketId]);
     }
-    rtcConnection.addTrack(outputNodes[socketId].stream.getAudioTracks()[0], window.localStream);
-    rtcConnection.addTrack(window.localStream.getVideoTracks()[0], window.localStream);
-
+    let senderAudio = rtcConnection.addTrack(outputNodes[socketId].stream.getAudioTracks()[0], window.localStream);
+    let senderVideo = rtcConnection.addTrack(window.localStream.getVideoTracks()[0], window.localStream);
+    /*if (debugging) {
+        let paramsAudio = senderAudio.getParameters();
+        let paramsVideo = senderVideo.getParameters();
+        paramsAudio.encodings[0].maxBitrate = uploadSpeedCap
+        paramsVideo.encodings[0].maxBitrate = uploadSpeedCap
+        senderAudio.setParameters(paramsAudio).then(() => {
+            senderVideo.setParameters(paramsVideo).then(() => {
+                console.log("Update bitrate upload")
+            })
+        });
+    }*/
     //TODO check if the commented stuff below is needed
     // probably not, on connection we should just stream whatever.
     // Correct mixing happens on updated networksplits
@@ -1085,6 +1115,14 @@ async function evaluateElectionNeed(sock) {
     if (bitratesUp[sock].length > 0) {
         let res = lastResult[sock];
         res.forEach(report => {
+            /*if (report.type === 'inbound-rtp' && report.kind === "audio") {
+                if (report.concealedSamples !== undefined && report.concealedSamples > 1500) {
+                    electionNeeded = true;
+                }
+                if (report.packetsLost !== undefined && report.packetsLost > 50) {
+                    electionNeeded = true;
+                }
+            }*/
             if (report.type === 'outbound-rtp') {
                 var str = report.id;
                 var str_pos = str.indexOf("Video");
@@ -1097,7 +1135,7 @@ async function evaluateElectionNeed(sock) {
                 }
                 /* console.log(report)
                  console.log(Object.keys(report))*/
-                if (report.qualityLimitationResolutionChanges >= 5 || report.pliCount >= 3) {
+                if (report.qualityLimitationResolutionChanges >= 5 || report.pliCount >= 5) {
                     //Resolution changes is in-built webRTC. Resolution changes if GPU stutters or not enough broadband
                     //pliCount is a packet response if video specifically drops a frame
                     electionNeeded = true;
@@ -1119,12 +1157,12 @@ async function evaluateElectionNeed(sock) {
 
 async function forceElection() {
     electionInitiated = true;
+    electionBenchMarksSent = true;
     let flag = {type: "initiateElection", origin: socket.id}
     sendToAll(JSON.stringify(flag))
     for (const [sock, _] of Object.entries(RTCConnections)) {
         await benchMarkPeer(sock);
     }
-    electionBenchMarksSent = true;
 }
 
 async function bitRateEveryone() {
@@ -1140,11 +1178,14 @@ async function bitRateEveryone() {
             let summerUp = bitratesUp[sock].reduce((sum, num) => sum + num)
             let avgUp = summerUp / bitratesUp[sock].length;
             totalSumUp += avgUp;
-            console.log("Average bitrate for video: (" + sock + ") " + avgUp);
+            console.log("Average bitrate up for video: (" + sock + ") " + avgUp);
+            console.log("Bitrate measurements up for " + sock + ": " + bitratesUp[sock]);
             let summerDown = bitratesDown[sock].reduce((sum, num) => sum + num)
             let avgDown = summerDown / bitratesDown[sock].length;
             totalSumDown += avgDown;
-            console.log("Average bitrate for video: (" + sock + ") " + avgDown);
+            console.log("Average bitrate down for video: (" + sock + ") " + avgDown);
+            console.log("Bitrate measurements down for " + sock + ": " + bitratesDown[sock]);
+
         }
     }
     console.log("Average for all bitrates down: " + totalSumDown);
@@ -1174,11 +1215,12 @@ async function pollMixerPerformance() {
     console.log("PollMixerPerformance: newsplitWanted =" + newSplitWanted)
 
     if (newSplitWanted) {
-        let quotient = Math.floor(roomConnectionsSet.size / mixingPeers.length)
-        console.log("PollMixerPerformance: quotient = " + quotient)
+        let quotient = Math.floor(roomConnectionsSet.size / mixingPeers.length);
+        console.log("PollMixerPerformance: quotient = " + quotient);
 
         let remainder = roomConnectionsSet.size % mixingPeers.length;
-        console.log("PollMixerPerformance: remainder = " + remainder)
+        console.log("PollMixerPerformance: remainder = " + remainder);
+        console.log("PollMixerPerformance: quotient + remainder = " + (quotient + remainder));
 
         if ((quotient + remainder) > allowedSubNetworkSize) {
             // Can't possibly split network so each mixer has < 3 peers
@@ -1188,7 +1230,12 @@ async function pollMixerPerformance() {
             let newMixerFound = false;
             let candidate;
             while (!newMixerFound) {
-                let item = peersToDistribute[Math.floor(Math.random() * peersToDistribute.length)];
+                let item;
+                if (debugging) {
+                    item = mixersIWant[Math.floor(Math.random() * mixersIWant.length)]
+                } else {
+                    item = peersToDistribute[Math.floor(Math.random() * peersToDistribute.length)];
+                }
                 if (!mixingPeers.includes(item)) {
                     candidate = item;
                     newMixerFound = true;
@@ -1241,7 +1288,7 @@ async function pollMixerPerformance() {
     //populateNetwork()                                                                                       //maybe not
 }
 
-setInterval(bitRateEveryone, 1000 * 15);
+setInterval(bitRateEveryone, 1000 * 10);
 setInterval(pollMixerPerformance, 1000 * 30);
 
 function bitRateBenchMark(socketID) {
@@ -1250,72 +1297,96 @@ function bitRateBenchMark(socketID) {
         bitratesUp[socketID] = [];
         frameEncodeTimes[socketID] = [];
     }
-
     RTCConnections[socketID].getStats().then(res => {
         res.forEach(report => {
-            let bytes;
-            let headerBytes;
-            //let packets;
-            if (report.type === "candidate-pair") {
-                //console.log(report)
-                //console.log(Object.keys(report))
-                const now = report.timestamp;
-                let bytesUp = report.bytesSent;
-                let bytesDown = report.bytesReceived;
+                let bytes;
+                let headerBytes;
+                //let packets;
+                /*if (report.type == "inbound-rtp" && report.kind) {
+                    //console.log(report)
+                    //console.log(Object.keys(report))
+                    const now = report.timestamp;
+                    let bytesDown = report.bytesReceived;
+                    let bytesHeaderDown = report.headerBytesReceived;
 
-                //packets = report.packetsSent;
-                if (lastResult[socketID] && lastResult[socketID].has(report.id)) {
-                    const deltaT = now - lastResult[socketID].get(report.id).timestamp;
-                    // calculate bitrate
-                    const bitrateUp = 8 * (bytesUp - lastResult[socketID].get(report.id).bytesSent) /
-                        deltaT;
-                    const bitrateDown = 8 * (bytesDown - lastResult[socketID].get(report.id).bytesReceived) /
-                        deltaT;
-                    //const headerrate = 8 * (headerBytes - lastResult[socketID].get(report.id).headerBytesSent) /
-                    //    deltaT;
-                    //console.log("bitrates to " + socketID + ": " + bitrate)
-                    bitratesUp[socketID].push(bitrateUp);
-                    bitratesDown[socketID].push(bitrateDown);
-                    //console.log("frameencode to " + socketID + ": " + avgFrameEncodeTimeSinceLast)
-                    //frameEncodeTimes[socketID].push(avgFrameEncodeTimeSinceLast);
-                    //console.log(frameEncodeTimes)
-                }
+                    //packets = report.packetsSent;
+                    if (lastResult[socketID] && lastResult[socketID].has(report.id)) {
+                        const deltaT = now - lastResult[socketID].get(report.id).timestamp;
+                        // calculate bitrate
+                        var bitrateDown = 8 * (bytesDown - lastResult[socketID].get(report.id).bytesReceived) /
+                            deltaT;
+                        bitrateDown = bitrateDown + (8 * (bytesHeaderDown - lastResult[socketID].get(report.id).headerBytesReceived) /
+                            deltaT)
+                        //const headerrate = 8 * (headerBytes - lastResult[socketID].get(report.id).headerBytesSent) /
+                        //    deltaT;
+                        //console.log("bitrates to " + socketID + ": " + bitrate)
+                        if (bitrateDown == 0) return;
+                        bitratesUp[socketID].push(0);
+                        bitratesDown[socketID].push(bitrateDown);
+                    }
+                }*/
+                if (report.type === "candidate-pair") {
+                    if (report.state != "succeeded") return;
+                    //console.log(report)
+                    //console.log(Object.keys(report))
+                    const now = report.timestamp;
+                    let bytesUp = report.bytesSent;
+                    let bytesDown = report.bytesReceived;
 
+                    //packets = report.packetsSent;
+                    if (lastResult[socketID] && lastResult[socketID].has(report.id)) {
+                        const deltaT = now - lastResult[socketID].get(report.id).timestamp;
+                        // calculate bitrate
+                        const bitrateUp = 8 * (bytesUp - lastResult[socketID].get(report.id).bytesSent) /
+                            deltaT;
+                        const bitrateDown = 8 * (bytesDown - lastResult[socketID].get(report.id).bytesReceived) /
+                            deltaT;
+                        //const headerrate = 8 * (headerBytes - lastResult[socketID].get(report.id).headerBytesSent) /
+                        //    deltaT;
+                        //console.log("bitrates to " + socketID + ": " + bitrate)
+                        if (bitrateUp == 0 || bitrateDown == 0) return;
+                        bitratesUp[socketID].push(bitrateUp);
+                        bitratesDown[socketID].push(bitrateDown);
+                        //console.log("frameencode to " + socketID + ": " + avgFrameEncodeTimeSinceLast)
+                        //frameEncodeTimes[socketID].push(avgFrameEncodeTimeSinceLast);
+                        //console.log(frameEncodeTimes)
+                    }
+                }
+                if (report.type === 'outbound-rtp') {
+                    var str = report.id;
+                    var str_pos = str.indexOf("Video");
+                    if (!(str_pos > -1)) {
+                        // Ignores reports from 'audio' channels for instance. Video channels are the significant factor in bitrate
+                        return
+                    }
+                    if (report.isRemote) {
+                        return;
+                    }
+                    //console.log(report)
+                    //console.log(Object.keys(report))
+                    const now = report.timestamp;
+                    bytes = report.bytesSent;
+                    headerBytes = report.headerBytesSent;
+                    //packets = report.packetsSent;
+                    if (lastResult[socketID] && lastResult[socketID].has(report.id)) {
+                        const deltaFrames = report.framesEncoded - lastResult[socketID].get(report.id).framesEncoded;
+                        const deltaTimeF = report.totalEncodeTime - lastResult[socketID].get(report.id).totalEncodeTime;
+                        const avgFrameEncodeTimeSinceLast = deltaTimeF / deltaFrames;
+                        const deltaT = now - lastResult[socketID].get(report.id).timestamp;
+                        // // calculate bitrate
+                        // const bitrate = 8 * (bytes - lastResult[socketID].get(report.id).bytesSent) /
+                        //     deltaT;
+                        // //const headerrate = 8 * (headerBytes - lastResult[socketID].get(report.id).headerBytesSent) /
+                        // //    deltaT;
+                        // //console.log("bitrates to " + socketID + ": " + bitrate)
+                        // bitratesUp[socketID].push(bitrate);
+                        //console.log("frameencode to " + socketID + ": " + avgFrameEncodeTimeSinceLast)
+                        frameEncodeTimes[socketID].push(avgFrameEncodeTimeSinceLast);
+                        //console.log(frameEncodeTimes)
+                    }
+                }
             }
-            if (report.type === 'outbound-rtp') {
-                var str = report.id;
-                var str_pos = str.indexOf("Video");
-                if (!(str_pos > -1)) {
-                    // Ignores reports from 'audio' channels for instance. Video channels are the significant factor in bitrate
-                    return
-                }
-                if (report.isRemote) {
-                    return;
-                }
-                //console.log(report)
-                //console.log(Object.keys(report))
-                const now = report.timestamp;
-                bytes = report.bytesSent;
-                headerBytes = report.headerBytesSent;
-                //packets = report.packetsSent;
-                if (lastResult[socketID] && lastResult[socketID].has(report.id)) {
-                    const deltaFrames = report.framesEncoded - lastResult[socketID].get(report.id).framesEncoded;
-                    const deltaTimeF = report.totalEncodeTime - lastResult[socketID].get(report.id).totalEncodeTime;
-                    const avgFrameEncodeTimeSinceLast = deltaTimeF / deltaFrames;
-                    const deltaT = now - lastResult[socketID].get(report.id).timestamp;
-                    // // calculate bitrate
-                    // const bitrate = 8 * (bytes - lastResult[socketID].get(report.id).bytesSent) /
-                    //     deltaT;
-                    // //const headerrate = 8 * (headerBytes - lastResult[socketID].get(report.id).headerBytesSent) /
-                    // //    deltaT;
-                    // //console.log("bitrates to " + socketID + ": " + bitrate)
-                    // bitratesUp[socketID].push(bitrate);
-                    //console.log("frameencode to " + socketID + ": " + avgFrameEncodeTimeSinceLast)
-                    frameEncodeTimes[socketID].push(avgFrameEncodeTimeSinceLast);
-                    //console.log(frameEncodeTimes)
-                }
-            }
-        });
+        );
         lastResult[socketID] = res;
     });
 }
@@ -1677,7 +1748,7 @@ function onReceiveMessageCallback(event) {
             console.log(data.networkData);
             for (const [id, _] of Object.entries(data.networkData)) {
                 console.log("Networksplit message: " + id + " mixes for " + data.networkData[id]);
-                postChatMessage("Networksplit message: " + id + " mixes for " + data.networkData[id], "")
+                //postChatMessage("Networksplit message: " + id + " mixes for " + data.networkData[id], "")
             }
             networkSplit = data.networkData;
             let newMixers = Object.keys(networkSplit);
@@ -1686,12 +1757,12 @@ function onReceiveMessageCallback(event) {
             //populateNetwork()                                                                               //Maybe not
             if (isMixingPeer && !clientInMixerChoices) {
                 console.log("Turn nonmixer")
-                postChatMessage("Turn nonmixer", socket.id)
+                //postChatMessage("Turn nonmixer", socket.id)
                 handleTurningNonMixer();
             } else if (!isMixingPeer && clientInMixerChoices) {
                 console.log("Turn mixer from networkSplit update")
                 isMixingPeer = true;
-                postChatMessage("Turn mixer from networkSplit update", socket.id)
+                //postChatMessage("Turn mixer from networkSplit update", socket.id)
                 startCapturingToCanvas();
                 initVideoAndAudioNodesAsMixer();
                 updateTracksAsMixer();
@@ -2005,6 +2076,9 @@ async function sendChatMessage(str) {
 }
 
 async function postChatMessage(str, nickname) {
+    if (debugging) {
+        mixersIWant.push(str);
+    }
     console.log("Uploaded message: " + str);
     var ts = Date.now();
     var h = new Date(ts).getHours();
