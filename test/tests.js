@@ -51,7 +51,7 @@ async function joinExisting(joinerBrowser, groupName, password) {
             .on('requestfailed', request =>
                 console.log(`${request.failure().errorText} ${request.url()}`))
     }
-    await joinerPage.goto('http://localhost');
+    await joinerPage.goto('http://192.168.87.114');
     await joinerPage.click('aria/button[name="JOIN"]');
     await joinerPage.click('aria/textbox[name="Enter Room ID"]');
     await joinerPage.type('aria/textbox[name="Enter Room ID"]', groupName);
@@ -101,11 +101,13 @@ async function joinPreExistingRoom(groupName, password) {
 
 async function joinPreExistingRoomAndHang(groupName, password) {
     const joinerBrowser = await puppeteer.launch({
+        headless: true,
         args: [
+            ' --unsafely-treat-insecure-origin-as-secure="http://172.20.176.1"',
             '--use-fake-ui-for-media-stream',
             '--use-fake-device-for-media-stream',
-            'autoclose=False'
-        ]
+            '--no-sandbox',
+            '--autoclose=false']
     });
     let joinerPage = joinExisting(joinerBrowser, groupName, password)
     //await joinerPage.screenshot({path: 'test-dls/joinExistingHang.png'});
@@ -119,16 +121,23 @@ async function testCreateRoom(groupName, password) {
         ]
     });
     let page = await createNewRoom(browser, groupName, password);
-   // await page.screenshot({path: 'test-dls/exampleGroup.png'});
+    // await page.screenshot({path: 'test-dls/exampleGroup.png'});
     await browser.close();
 }
 
 
-
 let logging = true;
-joinPreExistingRoomAndHang("Russia", "1234").then(r => {
-    console.log("blyat")
+const joinerBrowser = puppeteer.launch({
+    headless: false,
+    args: [
+        '--use-fake-ui-for-media-stream',
+        '--use-fake-device-for-media-stream',
+        '--no-sandbox',
+        '--autoclose=false']
 });
+// joinPreExistingRoomAndHang("Russia", "1234").then(r => {
+//     console.log("blyat")
+// });
 /*
 screenCapMainPage().then(r => console.log("screenCapMainPage test done"));
 testCreateRoom("Communism Carnival", "1234").then(r => console.log("testCreateRoom test done"));

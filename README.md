@@ -17,6 +17,7 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
 - Implement file sharing system
     - Display Shared files (immutable)
     - (Done) Download link shows up in chatlogs
+    - Error handling for datachannel (not logging erros in timesync messages, catching errors in sendToAll)
 
 - Tracking of network activity for topology / visual representation of network for debugging/presentation (graph)
     - Mixing peer nodes should be from mixingPeers (array)
@@ -25,6 +26,7 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
     - Mixer election protocol (multiple mixers)  
      
 - Set up Pumba testing environment
+
 # Testing
 - Latency test for audio
     - Scenario 1
