@@ -204,7 +204,7 @@ let peerElectionPoints = {};
 let electionInitiated = false;
 let electionNum = 0;
 let allowedSubNetworkSize = 3;
-let debugging = false;
+let debugging = true;
 let uploadSpeedCap = 250;
 let supremeMixerPeer;
 let myMicNode;
@@ -2077,7 +2077,7 @@ async function sendChatMessage(str) {
 
 async function postChatMessage(str, nickname) {
     if (debugging) {
-        mixersIWant.push(str);
+        //mixersIWant.push(str);
     }
     console.log("Uploaded message: " + str);
     var ts = Date.now();
