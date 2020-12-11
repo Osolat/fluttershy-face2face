@@ -74,7 +74,7 @@ let analyserNode = audioContext.createAnalyser();
 var frequencyArray = new Uint8Array(analyserNode.frequencyBinCount);
 let emptyFrequencyArray = new Uint8Array(analyserNode.frequencyBinCount);
 let stringifiedEmpty = JSON.stringify(emptyFrequencyArray);
-let audioTesting = true;
+let audioTesting = false;
 if (audioTesting) {
     const audioTestButton = document.getElementById("audio-test");
     audioTestButton.addEventListener("click", () => {
@@ -166,7 +166,7 @@ networkButton.addEventListener('click', () => {
 
 let localVid = document.getElementById('local-video');
 localVid.addEventListener("click", () => {
-    bruteForceElectionInMyFavour();
+    bruteForceElectionInMyFavour()
 });
 const sendFileButton = document.querySelector('button#sendFile');
 sendFileButton.addEventListener('click', () => {
@@ -203,7 +203,7 @@ let benchmarkResponses = {};
 let peerElectionPoints = {};
 let electionInitiated = false;
 let electionNum = 0;
-let allowedSubNetworkSize = 3;
+let allowedSubNetworkSize = 1;
 let debugging = true;
 let uploadSpeedCap = 250;
 let supremeMixerPeer;
@@ -651,11 +651,13 @@ async function bootAndGetSocket() {
             if (supremeMixerPeer === socket.id) {
                 console.log("This stuff happened 3")
                 networkSplit[socket.id].push(data.socket);
-                sendToAll(JSON.stringify({
-                    type: "networkSplit",
-                    origin: socket.id,
-                    networkData: networkSplit
-                }))
+                newChannel.onopen = () => {
+                    sendToAll(JSON.stringify({
+                        type: "networkSplit",
+                        origin: socket.id,
+                        networkData: networkSplit
+                    }))
+                }
             }
         }
         if (!RTCConnectionsCallStatus[data.socket]) {
@@ -682,11 +684,13 @@ async function bootAndGetSocket() {
                 if (supremeMixerPeer === socket.id) {
                     console.log("This stuff happened 1")
                     networkSplit[socket.id].push(data.socket);
-                    sendToAll(JSON.stringify({
-                        type: "networkSplit",
-                        origin: socket.id,
-                        networkData: networkSplit
-                    }))
+                    dataChannel.onopen = () => {
+                        sendToAll(JSON.stringify({
+                            type: "networkSplit",
+                            origin: socket.id,
+                            networkData: networkSplit
+                        }))
+                    }
                 }
             }
         })
@@ -699,11 +703,13 @@ async function bootAndGetSocket() {
                 if (supremeMixerPeer === socket.id) {
                     console.log("This stuff happened 2")
                     networkSplit[socket.id].push(data.socket);
-                    sendToAll(JSON.stringify({
-                        type: "networkSplit",
-                        origin: socket.id,
-                        networkData: networkSplit
-                    }))
+                    dataChannel.onopen = () => {
+                        sendToAll(JSON.stringify({
+                            type: "networkSplit",
+                            origin: socket.id,
+                            networkData: networkSplit
+                        }))
+                    }
                 }
             }
         }
@@ -996,7 +1002,10 @@ function gotStream(stream) {
     const localVideo = document.getElementById("local-video");
     localVideo.srcObject = stream;
     window.localStream = stream;
-    console.log(stream.getTracks());
+    //console.log(stream.getTracks());
+    for (let i = 0; i < stream.getTracks().length; i++) {
+        console.log(stream.getTracks()[i].getSettings())
+    }
     audioContext.resume();
     console.log("Creating myMicNode now")
     myMicNode = audioContext.createMediaStreamSource(localVideo.srcObject);
@@ -1231,11 +1240,12 @@ async function pollMixerPerformance() {
             let candidate;
             while (!newMixerFound) {
                 let item;
-                if (debugging) {
+                /*if (debugging) {
                     item = mixersIWant[Math.floor(Math.random() * mixersIWant.length)]
                 } else {
                     item = peersToDistribute[Math.floor(Math.random() * peersToDistribute.length)];
-                }
+                }*/
+                item = peersToDistribute[Math.floor(Math.random() * peersToDistribute.length)];
                 if (!mixingPeers.includes(item)) {
                     candidate = item;
                     newMixerFound = true;
@@ -1288,8 +1298,8 @@ async function pollMixerPerformance() {
     //populateNetwork()                                                                                       //maybe not
 }
 
-setInterval(bitRateEveryone, 1000 * 10);
-setInterval(pollMixerPerformance, 1000 * 30);
+setInterval(bitRateEveryone, 1000 * 30);
+setInterval(pollMixerPerformance, 1000 * 15);
 
 function bitRateBenchMark(socketID) {
     if (!bitratesUp[socketID]) {
@@ -1336,7 +1346,7 @@ function bitRateBenchMark(socketID) {
                     //packets = report.packetsSent;
                     if (lastResult[socketID] && lastResult[socketID].has(report.id)) {
                         const deltaT = now - lastResult[socketID].get(report.id).timestamp;
-                        // calculate bitrate
+                        // calculate bitrate. Bytes are measures in KB.
                         const bitrateUp = 8 * (bytesUp - lastResult[socketID].get(report.id).bytesSent) /
                             deltaT;
                         const bitrateDown = 8 * (bytesDown - lastResult[socketID].get(report.id).bytesReceived) /
