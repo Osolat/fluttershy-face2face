@@ -74,7 +74,7 @@ let analyserNode = audioContext.createAnalyser();
 var frequencyArray = new Uint8Array(analyserNode.frequencyBinCount);
 let emptyFrequencyArray = new Uint8Array(analyserNode.frequencyBinCount);
 let stringifiedEmpty = JSON.stringify(emptyFrequencyArray);
-let audioTesting = false;
+let audioTesting = true;
 if (audioTesting) {
     const audioTestButton = document.getElementById("audio-test");
     audioTestButton.addEventListener("click", () => {
@@ -166,7 +166,7 @@ networkButton.addEventListener('click', () => {
 
 let localVid = document.getElementById('local-video');
 localVid.addEventListener("click", () => {
-    forceElection();
+    bruteForceElectionInMyFavour();
 });
 const sendFileButton = document.querySelector('button#sendFile');
 sendFileButton.addEventListener('click', () => {
