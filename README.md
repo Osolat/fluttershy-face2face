@@ -1,6 +1,10 @@
 # fluttershy-face2face
 This is a repository for the P2P course, which aims to implement WebRTC and some P2P architecture to create a collaborative video conference application.
-
+# How to Run
+- Navigate to /main folder
+- run 'npm install'
+- run 'npm app.js'
+- Access 'https://localhost' 
 # Interesting Links
 - (webRTC stats) https://www.w3.org/TR/webrtc-stats/#dom-rtcoutboundrtpstreamstats-totalpacketsenddelay
 - (For text editing) https://blog.datproject.org/2019/03/05/caracara-react-dat-automerge/
