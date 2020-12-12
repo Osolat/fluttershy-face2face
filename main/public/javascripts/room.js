@@ -165,9 +165,9 @@ networkButton.addEventListener('click', () => {
 })
 
 let localVid = document.getElementById('local-video');
-localVid.addEventListener("click", () => {
-    bruteForceElectionInMyFavour()
-});
+// localVid.addEventListener("click", () => {
+//     bruteForceElectionInMyFavour()
+// });
 const sendFileButton = document.querySelector('button#sendFile');
 sendFileButton.addEventListener('click', () => {
     if (!filetransfer.fileEmpty()) {
@@ -204,7 +204,7 @@ let peerElectionPoints = {};
 let electionInitiated = false;
 let electionNum = 0;
 let allowedSubNetworkSize = 1;
-let debugging = true;
+let debugging = false;
 let uploadSpeedCap = 250;
 let supremeMixerPeer;
 let myMicNode;
