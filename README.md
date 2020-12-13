@@ -18,5 +18,3 @@ This is a repository for the P2P course, which aims to implement WebRTC and some
 - https://peertube.dk/
 - https://news.ycombinator.com/item?id=23398261
 - https://webtorrent.io/
-- https://github.com/webrtc/samples/blob/gh-pages/src/content/peerconnection/multiple/js/main.js
-    - For multiple streams. Mesh style.
